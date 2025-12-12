@@ -208,7 +208,7 @@
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = false; // 停用阻尼：停止拖拉後立即停止轉動
         // controls.dampingFactor = 0.05; // 停用阻尼後此參數無效
-        controls.rotateSpeed = 0.2; 
+        controls.rotateSpeed = 0.1; 
         controls.target.copy(originTarget);
         controls.update();
 
@@ -523,4 +523,5 @@
     </script>
 </body>
 </html>
+
 
