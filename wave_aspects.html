@@ -18,8 +18,8 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3ff6; color: #1f2937; }
-        /* 確保畫布容器填滿可用空間 */
-        #waveCanvas { width: 100%; height: 70vh; display: block; } 
+        /* 確保畫布容器填滿可用空間，高度調整為 60vh，以適應手機等小螢幕 */
+        #waveCanvas { width: 100%; height: 60vh; display: block; } 
         .control-card { background-color: white; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         /* 軸標籤的通用樣式 */
         .axis-label { position: absolute; font-size: 14px; font-weight: bold; color: white; padding: 2px 6px; border-radius: 4px; transform: translate(-50%, -50%); z-index: 10; }
@@ -66,16 +66,7 @@
                 <button id="toggleSurface" class="w-full py-3 rounded-lg font-bold text-white transition duration-200 shadow-lg bg-gray-600 hover:bg-gray-700">
                     顯示曲面
                 </button>
-                <a href="index.html" style="
-                    display: inline-block;
-                    padding: 10px 15px;
-                    background-color: #007bff; /* 藍色 */
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    font-weight: bold;
-                    margin-top: 20px;
-                ">返回主目錄</a>
+                
                 
             </div>
 
@@ -528,12 +519,4 @@
 })(); // IIFE 結尾
     </script>
 </body>
-
-
-<!--<p><a href="index.html">返回首頁</a></p>
-
-<button onclick="window.location.href='index.html'">回首頁</button>-->
-
-
 </html>
-
