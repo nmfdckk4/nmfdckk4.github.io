@@ -19,7 +19,7 @@
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3ff6; color: #1f2937; }
         /* 確保畫布容器填滿可用空間，高度調整為 60vh，以適應手機等小螢幕 */
-        #waveCanvas { width: 100%; height: 60vh; display: block; } 
+        #waveCanvas { width: 100%; height: 45vh; display: block; } 
         .control-card { background-color: white; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
         /* 軸標籤的通用樣式 */
         .axis-label { position: absolute; font-size: 14px; font-weight: bold; color: white; padding: 2px 6px; border-radius: 4px; transform: translate(-50%, -50%); z-index: 10; }
@@ -193,10 +193,10 @@
         // 相機 (正交投影)
         const aspect = $canvasContainer.clientWidth / $canvasContainer.clientHeight;
         camera = new THREE.OrthographicCamera(-ORTHO_SIZE * aspect, ORTHO_SIZE * aspect, ORTHO_SIZE, -ORTHO_SIZE, 0.1, 100);
-        const originTarget = new THREE.Vector3(0, 0, 0);
+        const originTarget = new THREE.Vector3(T_MAX*0.45, 0, -X_MAX*1.8);
         
         // 調整相機位置以獲得良好的初始視角
-        camera.position.set(0, 0, X_MAX * 1.8);
+        camera.position.set(T_MAX * 0.45, 0, X_MAX * 1.8);
         camera.lookAt(originTarget);
 
         // 渲染器
@@ -523,5 +523,4 @@
     </script>
 </body>
 </html>
-
 
