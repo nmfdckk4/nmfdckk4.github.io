@@ -114,16 +114,19 @@
     const T_STEP = T_MAX / T_SEGMENTS;
     
     // 相機正交投影大小 (決定視圖的縮放比例)
-    const ORTHO_SIZE = 4; 
+    const ORTHO_SIZE = 6; 
     
-    // 軸標籤的 3D 終端位置
+    // T 軸刻度標籤的 3D 偏移量 (沿 Z 軸，負值表示遠離 X 軸)
+    const T_TICK_LABEL_OFFSET = -0.5; // <-- 調整這裡的數值來控制時間刻度數字的距離
+
+    // 軸標籤的 3D 終端位置 (調整這些值來控制 X, Y, T 軸標籤的距離)
     const AXIS_LABEL_POSITIONS = {
-        // X (Position) 軸沿 世界Z 軸
-        x: new THREE.Vector3(0, 0, X_MAX + 1.5), 
-        // Y (Displacement) 軸沿 世界Y 軸
-        y: new THREE.Vector3(X_MIN, A * 2.5 + 0.8, 0),
-        // T (Time) 軸沿 世界X 軸
-        t: new THREE.Vector3(T_MAX + 1.5, 0, 0),
+        // X (Position) 軸沿 世界Z 軸 (X_MAX + [距離偏移量])
+        x: new THREE.Vector3(0, 0, X_MAX + 1), // <-- 調整這裡的 1.5
+        // Y (Displacement) 軸沿 世界Y 軸 (A * 2.5 + [距離偏移量])
+        y: new THREE.Vector3(X_MIN, A * 2.5 + 0.5, 0), // <-- 調整這裡的 0.8
+        // T (Time) 軸沿 世界X 軸 (T_MAX + [距離偏移量])
+        t: new THREE.Vector3(T_MAX + 1, 0, 0), // <-- 調整這裡的 1.5
     };
 
     // DOM 元素 (快取)
@@ -203,8 +206,8 @@
 
         // 控制器
         controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // 啟用阻尼
-        controls.dampingFactor = 0.05;
+        controls.enableDamping = false; // 停用阻尼：停止拖拉後立即停止轉動
+        // controls.dampingFactor = 0.05; // 停用阻尼後此參數無效
         controls.rotateSpeed = 0.2; 
         controls.target.copy(originTarget);
         controls.update();
@@ -254,7 +257,7 @@
             $labelsContainer.appendChild($label);
             
             tAxisLabels.push({
-                position: new THREE.Vector3(t_val, 0, X_MIN - 0.5), // 儲存 3D 投影位置
+                position: new THREE.Vector3(t_val, 0, X_MIN + T_TICK_LABEL_OFFSET), // 使用 T_TICK_LABEL_OFFSET
                 element: $label
             });
         }
