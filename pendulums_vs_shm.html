@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>單擺與簡諧運動週期比較</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 MathJax 腳本來渲染 LaTeX 數學公式 -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$']]
+            }
+        };
+    </script>
+    <!-- 移除了 polyfill.io 以確保安全性，現代瀏覽器已原生支持 ES6 -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .canvas-container {
+            border: 1px solid #e0e0e0;
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            position: relative; /* 確保 canvas 縮放正常 */
+        }
+        canvas {
+            display: block; /* 移除 canvas底部的預設空白 */
+        }
+        #mainCanvas {
+            width: 100%;
+            height: 400px;
+        }
+        #plotCanvas {
+            width: 100%;
+            height: 200px;
+        }
+        .shm-formula {
+            font-size: 1.125rem; /* text-lg */
+            color: #1D4ED8; /* blue-700 */
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <header class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">單擺與簡諧運動 (SHM) 週期比較</h1>
+        <p class="text-lg text-gray-600 mt-2">比較真實單擺運動與理想簡諧運動的差異</p>
+    </header>
+
+    <div class="max-w-4xl mx-auto">
+        
+        <!-- 運動微分方程區塊 -->
+        <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-3 text-indigo-700">運動微分方程 (RK4)</h2>
+            <p class="text-base text-gray-700">我們使用四階龍格-庫塔法 (RK4) 數值求解以下單擺微分方程：</p>
+            <!-- 使用 MathJax 顯示公式 -->
+            <div class="my-2 p-2 bg-gray-50 rounded-lg overflow-x-auto">
+                $$\frac{d^2\theta}{dt^2} + \frac{g}{L} \sin(\theta) = 0$$
+            </div>
+            <p class="text-base text-gray-700 mt-2">其中 $g$ 是重力加速度， $L$ 是擺長，$\theta$ 是擺角。</p>
+        </div>
+
+
+        <!-- 控制面板 (優化手機佈局) -->
+        <div class="bg-white p-4 rounded-xl shadow-lg mb-6">
+            <h2 class="text-xl font-semibold mb-3 text-indigo-700">參數設定</h2>
+            <div class="flex flex-wrap gap-4 items-end">
+                <!-- 輸入欄位使用 flex-1 和 min-w 確保手機上能自動分行且佈局美觀 -->
+                <div class="flex flex-col flex-1 min-w-[120px]">
+                    <label for="angleInput" class="text-sm font-medium text-gray-700">初始擺角 (度)</label>
+                    <input type="number" id="angleInput" value="30" min="1" max="170" step="1" class="mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full">
+                </div>
+                <div class="flex flex-col flex-1 min-w-[120px]">
+                    <label for="lengthInput" class="text-sm font-medium text-gray-700">單擺長度 L (m)</label>
+                    <input type="number" id="lengthInput" value="1.0" min="0.1" max="5.0" step="0.1" class="mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full">
+                </div>
+                <div class="flex flex-col flex-1 min-w-[120px]">
+                    <label for="gravityInput" class="text-sm font-medium text-gray-700">重力加速度 g (m/s²)</label>
+                    <input type="number" id="gravityInput" value="9.81" min="1.0" max="20.0" step="0.1" class="mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 w-full">
+                </div>
+                <button id="startButton" class="w-full sm:w-auto mt-4 sm:mt-0 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150">
+                    啟動/重置模擬
+                </button>
+            </div>
+        </div>
+
+        <!-- 動畫區 -->
+        <div class="canvas-container mb-6">
+            <h2 class="text-xl font-semibold p-4 border-b text-gray-800">運動動畫</h2>
+            <canvas id="mainCanvas"></canvas>
+        </div>
+
+        <!-- 週期比較結果區 -->
+        <div class="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
+            <div class="bg-white p-4 rounded-xl shadow-lg flex-1">
+                <h3 class="text-lg font-semibold text-red-600 mb-2">單擺</h3>
+                <p class="text-sm text-gray-700">模擬週期 $T_{\text{SP}}$ ($\text{s}$): <span id="periodSP" class="font-mono font-bold text-base">--</span> $\text{s}$</p>
+                <p class="text-sm text-gray-700">當前擺角 $\theta$: <span id="angleSP" class="font-mono text-base">--</span>°</p>
+                <p class="text-xs text-gray-500 mt-2">（從 $\theta=0$ 點穿越計時）</p>
+            </div>
+            <div class="bg-white p-4 rounded-xl shadow-lg flex-1">
+                <h3 class="text-lg font-semibold text-blue-600 mb-2">彈簧系統 (SHM)</h3>
+                <p class="text-sm text-gray-700 shm-formula">理想 SHM 週期 $T_{\text{SHM}} = 2\pi\sqrt{L/g}$ ($\text{s}$): <span id="periodSHM" class="font-mono font-bold text-base">--</span> $\text{s}$</p>
+                
+                <!-- 絕對週期差 (秒) -->
+                <p class="text-sm text-gray-700">絕對週期差 ($\Delta T = T_{\text{SP}} - T_{\text{SHM}}$): <span id="periodDiff" class="font-mono font-bold text-base text-green-600">--</span> $\text{s}$</p>
+                
+                <!-- 新增：相對週期差 (百分比) -->
+                <p class="text-sm text-gray-700">相對週期差 ($\% T_{\text{SHM}}$): <span id="periodPercent" class="font-mono font-bold text-base text-green-600">--</span> $\%$</p>
+
+                <p class="text-xs text-gray-500 mt-2">（僅在 $T_{\text{SP}}$ 穩定後顯示）</p>
+            </div>
+        </div>
+
+        <!-- 繪圖區 -->
+        <div class="canvas-container">
+            <h2 class="text-xl font-semibold p-4 border-b text-gray-800">水平位移 (x) 隨時間變化圖</h2>
+            <canvas id="plotCanvas"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- 物理常數與初始化 ---
+        const G = 9.81; 
+        const L = 1.0;  
+        const THETA_MAX_DEG = 30; 
+
+        let thetaMax = (THETA_MAX_DEG * Math.PI) / 180; 
+        let L_val = L;
+        let G_val = G;
+        let isRunning = false;
+        
+        let simTime = 0; // 模擬時間
+        let animationFrameId;
+
+        // --- 單擺狀態 (真實運動) ---
+        let thetaSP = thetaMax; // 角度 (弧度)
+        let omegaSP = 0;        // 角速度 dθ/dt
+
+        // 週期計算變量 - 僅用於計算 T/2 的累積和計數
+        let periodCountSP = 0;      // T/2 的計數器
+        let lastZeroCrossingTimeSP = 0; // 上次零點穿越的精確時間
+        let periodSumSP = 0;        // 累積的 T/2 時間和
+
+        // --- 彈簧系統狀態 (理想 SHM) ---
+        let omegaSHM; 
+        let A_SHM;      
+        let T_SHM_IDEAL;
+
+        // --- 繪圖資料與設定 ---
+        const mainCanvas = document.getElementById('mainCanvas');
+        const ctx = mainCanvas.getContext('2d');
+        const plotCanvas = document.getElementById('plotCanvas');
+        const plotCtx = plotCanvas.getContext('2d');
+
+        let plotData = []; 
+        const MAX_PLOT_POINTS = 1000; // 增加資料點上限以容納更長的時間
+        const MIN_PLOT_DURATION = 10; // X軸最小顯示時間，避免波形被過度擠壓
+        
+        // 修正步長以提高精度和穩定性
+        const SIMULATION_DT = 0.005; 
+
+        // --- DOM 元素 ---
+        const angleInput = document.getElementById('angleInput');
+        const lengthInput = document.getElementById('lengthInput');
+        const gravityInput = document.getElementById('gravityInput');
+        const startButton = document.getElementById('startButton');
+        // 統一單位顯示 (文字部分使用 MathJax 標籤，數值後使用 ' s')
+        const periodSPDisplay = document.getElementById('periodSP');
+        const periodSHMDisplay = document.getElementById('periodSHM');
+        const periodDiffDisplay = document.getElementById('periodDiff');
+        const periodPercentDisplay = document.getElementById('periodPercent'); // 新增
+        const angleSPDisplay = document.getElementById('angleSP');
+
+
+        // --- RK4 數值積分函數 ---
+        function f(theta, omega) {
+            const dtheta_dt = omega;
+            const domega_dt = -(G_val / L_val) * Math.sin(theta);
+            return [dtheta_dt, domega_dt];
+        }
+
+        function rk4Step(theta, omega, dt) {
+            // K1 Step
+            const k1 = f(theta, omega);
+            const k1_theta = k1[0];
+            const k1_omega = k1[1];
+            
+            // K2 Step
+            const k2 = f(theta + 0.5 * dt * k1_theta, omega + 0.5 * dt * k1_omega);
+            const k2_theta = k2[0];
+            const k2_omega = k2[1];
+
+            // K3 Step
+            const k3 = f(theta + 0.5 * dt * k2_theta, omega + 0.5 * dt * k2_omega);
+            const k3_theta = k3[0];
+            const k3_omega = k3[1];
+
+            // K4 Step
+            const k4 = f(theta + dt * k3_theta, omega + dt * k3_omega);
+            const k4_theta = k4[0];
+            const k4_omega = k4[1];
+
+            const newTheta = theta + (dt / 6.0) * (k1_theta + 2 * k2_theta + 2 * k3_theta + k4_theta);
+            const newOmega = omega + (dt / 6.0) * (k1_omega + 2 * k2_omega + 2 * k3_omega + k4_omega);
+
+            return { theta: newTheta, omega: newOmega };
+        }
+
+        // --- 繪製彈簧線圈函數 ---
+        function drawSpring(ctx, startX, startY, endX, endY) {
+            const coils = 15; // 彈簧圈數 (增加圈數使外觀更明顯)
+            const amplitude = 8; // 彈簧半徑 (幅度)
+            const length = endX - startX;
+            const segment = length / (coils * 2 + 2); 
+            
+            ctx.lineTo(startX + segment, startY); 
+
+            for (let i = 0; i < coils; i++) {
+                const x_mid = startX + segment + segment * (2 * i + 1);
+                const y_offset = (i % 2 === 0 ? amplitude : -amplitude);
+                
+                ctx.lineTo(x_mid, startY + y_offset);
+                ctx.lineTo(startX + segment + segment * (2 * i + 2), startY);
+            }
+            
+            ctx.lineTo(endX, endY); 
+        }
+
+
+        // --- 繪製函數 ---
+
+        function drawMainCanvas() {
+            const W = mainCanvas.width;
+            const H = mainCanvas.height;
+            const center_x = W / 2;
+            const pendulum_pivot_y = 50; // 支點 Y 座標
+            const max_x_offset = W * 0.4;
+            
+            // 調整垂直縮放比例的除數為 1.0 (讓單擺能佔用更多垂直空間)
+            const vertical_scale_factor = 1.0; 
+            const scale = Math.min(max_x_offset / L_val / 2, (H - pendulum_pivot_y - 20) / L_val / vertical_scale_factor); 
+            
+            // 依照使用者要求調整 Y 座標
+            const y_offset_shm = 285; 
+
+            ctx.clearRect(0, 0, W, H);
+
+            // --- Draw Pendulum (SP - Red) --- 
+            const xSP = center_x + L_val * Math.sin(thetaSP) * scale;
+            const ySP = pendulum_pivot_y + L_val * Math.cos(thetaSP) * scale;
+
+            // Draw line
+            ctx.strokeStyle = '#C0392B';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(center_x, pendulum_pivot_y);
+            ctx.lineTo(xSP, ySP);
+            ctx.stroke();
+
+            // Draw bob
+            ctx.fillStyle = '#E74C3C';
+            ctx.beginPath();
+            ctx.arc(xSP, ySP, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw pivot
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(center_x, pendulum_pivot_y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw equilibrium line (Vertical reference)
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(center_x, pendulum_pivot_y);
+            ctx.lineTo(center_x, H);
+            ctx.stroke();
+            ctx.setLineDash([]); 
+
+            // Pendulum Label
+            ctx.fillStyle = '#C0392B';
+            ctx.font = '20px Inter'; // 放大字體
+            ctx.textAlign = 'right'; 
+            ctx.fillText('單擺', W - 20, pendulum_pivot_y + 10);
+
+
+            // --- Draw Spring System (SHM - Blue) --- 
+            const xSHM_raw = A_SHM * Math.cos(omegaSHM * simTime); 
+            const xSHM = center_x + xSHM_raw * scale;
+            const ySHM = y_offset_shm;
+            
+            const fixed_wall_x = center_x - max_x_offset + 50; 
+
+            // Draw ground/track
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(center_x - max_x_offset, ySHM + 20);
+            ctx.lineTo(center_x + max_x_offset, ySHM + 20);
+            ctx.stroke();
+
+            // Draw fixed wall 
+            ctx.fillStyle = '#666';
+            ctx.fillRect(fixed_wall_x - 10, ySHM - 30, 10, 80);
+
+
+            // --- Draw Spring (使用線圈函數) ---
+            ctx.strokeStyle = '#3498DB';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(fixed_wall_x, ySHM); 
+            drawSpring(ctx, fixed_wall_x, ySHM, xSHM - 20, ySHM); // 繪製逼真的線圈
+            ctx.stroke();
+
+            // Draw mass block
+            ctx.fillStyle = '#3498DB';
+            ctx.fillRect(xSHM - 20, ySHM - 20, 40, 40);
+            ctx.strokeStyle = '#2980B9';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(xSHM - 20, ySHM - 20, 40, 40);
+
+            // Draw SHM equilibrium point
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.beginPath();
+            ctx.arc(center_x, ySHM, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // SHM Label Position
+            ctx.fillStyle = '#2980B9';
+            ctx.textAlign = 'right'; 
+            ctx.fillText('彈簧系統', W - 20, ySHM + 5); 
+            
+            ctx.textAlign = 'left'; // 重設對齊方式
+
+
+            // Update angle display
+            angleSPDisplay.textContent = ((thetaSP * 180) / Math.PI).toFixed(2);
+        }
+
+        function drawPlotCanvas() {
+            const W = plotCanvas.width;
+            const H = plotCanvas.height;
+            const plot_center_y = H / 2;
+            const plot_start_x = 40;    
+            const plot_width = W - plot_start_x - 10; // 繪圖區寬度
+
+            plotCtx.clearRect(0, 0, W, H);
+            
+            if (plotData.length < 2) return;
+            
+            // --- 決定 X 軸範圍 (從第一個資料點到當前模擬時間) ---
+            const t_start_displayed = plotData[0].t; 
+            const t_end_displayed = simTime; 
+            
+            // 總繪圖時間範圍 (確保至少為 MIN_PLOT_DURATION)
+            const duration = Math.max(t_end_displayed - t_start_displayed, MIN_PLOT_DURATION);
+            const plotScaleX = plot_width / duration; 
+
+            // Draw Axes
+            plotCtx.strokeStyle = '#aaa';
+            plotCtx.lineWidth = 1;
+            plotCtx.beginPath();
+            plotCtx.moveTo(plot_start_x, plot_center_y);
+            plotCtx.lineTo(W, plot_center_y);
+            plotCtx.moveTo(plot_start_x, 0);
+            plotCtx.lineTo(plot_start_x, H);
+            plotCtx.stroke();
+
+            // Labels
+            plotCtx.fillStyle = '#333';
+            
+            // X 軸單位
+            plotCtx.font = '14px Arial'; 
+            plotCtx.textAlign = 'left'; 
+            plotCtx.fillText('t (s)', W - 40, plot_center_y + 18); // X 軸單位
+            
+            // Y 軸標籤
+            plotCtx.font = '14px Inter'; 
+            plotCtx.fillText('位移 (x)', 5, 18); // Y 軸單位
+            
+            // 繪製 Y 軸 0 點標註
+            plotCtx.fillText('0', plot_start_x - 15, plot_center_y + 4); 
+            
+            // NOTE: 移除 X 軸起點和終點的數字標註，以滿足使用者需求
+
+
+            // Draw data points
+            const x_max = A_SHM * 1.1; 
+            const plotScaleY = H / x_max / 2 * 0.8; 
+
+            // 1. Pendulum (SP - Red)
+            plotCtx.strokeStyle = '#E74C3C';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+            
+            let { t: t0, xSP_theta: xSP_theta0 } = plotData[0];
+            
+            // 對於第一個點 t = t0，x 座標應為 plot_start_x
+            let x_coord0 = plot_start_x; 
+            let x_val0 = L_val * Math.sin(xSP_theta0);
+            let y_coord0 = plot_center_y - x_val0 * plotScaleY;
+            plotCtx.moveTo(x_coord0, y_coord0); 
+
+            for (let i = 1; i < plotData.length; i++) {
+                const { t, xSP_theta } = plotData[i];
+                // 修正：相對時間必須減去起點時間 t_start_displayed
+                const x_coord = plot_start_x + (t - t_start_displayed) * plotScaleX; 
+                const x_val = L_val * Math.sin(xSP_theta); // 單擺水平位移 x = L sin(theta)
+                const y_coord = plot_center_y - x_val * plotScaleY;
+                plotCtx.lineTo(x_coord, y_coord);
+            }
+            plotCtx.stroke();
+
+            // 2. SHM (Blue)
+            plotCtx.strokeStyle = '#3498DB';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+
+            let { t: t0_shm, xSHM: xSHM0 } = plotData[0];
+            // 同樣，起點 t0_shm - t_start_displayed = 0
+            let x_coord0_shm = plot_start_x; 
+            let y_coord0_shm = plot_center_y - xSHM0 * plotScaleY;
+            plotCtx.moveTo(x_coord0_shm, y_coord0_shm);
+
+            for (let i = 1; i < plotData.length; i++) {
+                const { t, xSHM } = plotData[i];
+                // 修正：相對時間必須減去起點時間 t_start_displayed
+                const x_coord = plot_start_x + (t - t_start_displayed) * plotScaleX;
+                const y_coord = plot_center_y - xSHM * plotScaleY;
+                plotCtx.lineTo(x_coord, y_coord);
+            }
+            plotCtx.stroke();
+            
+            // 3. 移除超出資料點上限的舊數據點
+            // 當點數超過上限時，X軸的起點時間 (t_start_displayed) 會隨之更新
+            while (plotData.length > MAX_PLOT_POINTS) {
+                plotData.shift();
+            }
+        }
+
+        // --- Main Loop ---
+
+        let lastTime = 0;
+        let accumulator = 0; 
+
+        function animate(timestamp) {
+            if (!isRunning) return;
+
+            if (lastTime === 0) lastTime = timestamp;
+            const elapsed = timestamp - lastTime;
+            lastTime = timestamp;
+
+            accumulator += elapsed;
+
+            let didSimulate = false;
+
+            // Fixed time step simulation loop
+            while (accumulator >= SIMULATION_DT * 1000) {
+                // --- 1. Simulate Pendulum (SP - True Motion) ---
+                const newState = rk4Step(thetaSP, omegaSP, SIMULATION_DT);
+
+                // --- 2. 週期檢查：精確零點穿越計算 (T/2 間隔) ---
+                
+                const theta_start = thetaSP;
+                const theta_end = newState.theta;
+
+                const isCrossing = (theta_start * theta_end <= 0) && (Math.abs(theta_start) > 1e-6); 
+
+                if (isCrossing) {
+                    const fraction = Math.abs(theta_start) / (Math.abs(theta_start) + Math.abs(theta_end));
+                    const T_crossing = simTime + fraction * SIMULATION_DT; 
+
+                    if (lastZeroCrossingTimeSP > 0) {
+                        const T_half = T_crossing - lastZeroCrossingTimeSP;
+                        
+                        periodSumSP += T_half; 
+                        periodCountSP++;       
+
+                        if (periodCountSP >= 2) {
+                            const avgHalfPeriod = periodSumSP / periodCountSP;
+                            const T_SP_Calculated = avgHalfPeriod * 2; 
+
+                            periodSPDisplay.textContent = T_SP_Calculated.toFixed(4);
+
+                            const diff = T_SP_Calculated - T_SHM_IDEAL;
+                            const diffPercent = (diff / T_SHM_IDEAL * 100); // 計算百分比
+
+                            // 絕對週期差 (S)
+                            periodDiffDisplay.textContent = `${diff.toFixed(4)}`; 
+                            // 相對週期差 (%)
+                            periodPercentDisplay.textContent = `${diffPercent.toFixed(2)}`; // 顯示百分比
+                        }
+                    }
+                    lastZeroCrossingTimeSP = T_crossing;
+                }
+                
+                thetaSP = newState.theta;
+                omegaSP = newState.omega;
+                
+                simTime += SIMULATION_DT; 
+                accumulator -= SIMULATION_DT * 1000;
+                didSimulate = true;
+            }
+
+
+            // --- 3. Plot Data Sampling ---
+            if (didSimulate && (plotData.length === 0 || simTime - plotData[plotData.length - 1].t > 0.05)) {
+                const xSHM_data = A_SHM * Math.cos(omegaSHM * simTime); 
+
+                plotData.push({ t: simTime, xSP_theta: thetaSP, xSHM: xSHM_data });
+            }
+            
+            drawMainCanvas();
+            drawPlotCanvas();
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- Initialization and Reset ---
+
+        function initSimulation() {
+            // Read and update parameters
+            G_val = parseFloat(gravityInput.value) || 9.81;
+            L_val = parseFloat(lengthInput.value) || 1.0;
+            // 使用 parseFloat 確保能讀取非整數角度，但步長已設為 1
+            const newThetaDeg = parseFloat(angleInput.value) || 30; 
+            thetaMax = (newThetaDeg * Math.PI) / 180;
+
+            // Recalculate SHM parameters
+            omegaSHM = Math.sqrt(G_val / L_val);
+            A_SHM = L_val * Math.sin(thetaMax); 
+            T_SHM_IDEAL = 2 * Math.PI / omegaSHM;
+
+            // Reset Pendulum State
+            thetaSP = thetaMax;
+            omegaSP = 0;
+            
+            // 重設週期計算變數
+            periodCountSP = 0; 
+            lastZeroCrossingTimeSP = 0;
+            periodSumSP = 0;
+            
+            simTime = 0; // 重設模擬時間
+
+            // Reset plot data and accumulator
+            plotData = [];
+            accumulator = 0;
+            
+            // Clear displays
+            periodSPDisplay.textContent = '--';
+            periodSHMDisplay.textContent = T_SHM_IDEAL.toFixed(4);
+            periodDiffDisplay.textContent = '--';
+            periodPercentDisplay.textContent = '--'; // 重設百分比顯示
+            angleSPDisplay.textContent = ((thetaMax * 180) / Math.PI).toFixed(2);
+
+
+            // Ensure Canvas dimensions are correct
+            mainCanvas.width = mainCanvas.clientWidth;
+            mainCanvas.height = 400;
+            plotCanvas.width = plotCanvas.clientWidth;
+            plotCanvas.height = 200;
+
+            drawMainCanvas();
+            drawPlotCanvas();
+
+            // 重新排版 MathJax
+            if (window.MathJax && typeof window.MathJax.typeset === 'function') {
+                window.MathJax.typeset();
+            }
+        }
+
+        function toggleSimulation() {
+            if (isRunning) {
+                cancelAnimationFrame(animationFrameId);
+                isRunning = false;
+                startButton.textContent = '啟動/重置模擬';
+                startButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                startButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            } else {
+                initSimulation(); // Reset state
+                isRunning = true;
+                lastTime = 0; 
+                startButton.textContent = '停止模擬';
+                startButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                startButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', toggleSimulation);
+
+        // Initial setup
+        initSimulation();
+
+        // Ensure responsiveness
+        window.addEventListener('resize', () => {
+            if (!isRunning) {
+                initSimulation();
+            } else {
+                mainCanvas.width = mainCanvas.clientWidth;
+                plotCanvas.width = plotCanvas.clientWidth;
+                drawMainCanvas();
+                drawPlotCanvas();
+            }
+        });
+
+    </script>
+</body>
+</html>
