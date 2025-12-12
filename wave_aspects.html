@@ -214,7 +214,7 @@
         scene.add(new THREE.AmbientLight(0xffffff, 1.0)); 
         
         // 2. 平行光 (Directional Light): 提供立體感和曲面細節。強度從 1.5 降到 1.0 以平衡強環境光。
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5); 
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0); 
         directionalLight.position.set(10, 10, 10);
         scene.add(directionalLight);
 
