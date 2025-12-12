@@ -134,7 +134,7 @@
     // 軸標籤的 3D 終端位置 
     const AXIS_LABEL_POSITIONS = {
         // X (Position) 軸沿 世界Z 軸
-        x: new THREE.Vector3(0, 0, X_MAX + 1.5), 
+        x: new THREE.Vector3(0, 0, X_MAX + 1), 
         // Y (Displacement) 軸沿 世界Y 軸
         y: new THREE.Vector3(X_MIN, A * 2.5 + 0.8, 0), 
         // T (Time) 軸沿 世界X 軸
@@ -211,7 +211,7 @@
         camera = new THREE.OrthographicCamera(-ORTHO_SIZE * aspect, ORTHO_SIZE * aspect, ORTHO_SIZE, -ORTHO_SIZE, 0.1, 100);
         
         // 計算相機的初始位置，使其與新目標的相對位置與原點保持一致
-        const initialOffset = new THREE.Vector3(T_MAX * 0, A * 0, X_MAX * 1.8);
+        const initialOffset = new THREE.Vector3(T_MAX * 1, A * 0, X_MAX * 8);
         camera.position.copy(DEFAULT_ROTATION_TARGET).add(initialOffset); // 相機位置設定在目標點的偏移處
         
         camera.lookAt(DEFAULT_ROTATION_TARGET); // 相機看向目標點
@@ -515,4 +515,5 @@
     </script>
 </body>
 </html>
+
 
