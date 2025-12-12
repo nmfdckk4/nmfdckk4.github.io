@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡諧運動與圓周運動投影動畫 (可拖拉)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            max-width: 800px;
+            width: 100%;
+        }
+        canvas {
+            background-color: #eef2ff; /* 淺藍色背景 */
+            border-radius: 0.5rem;
+            border: 1px solid #c7d2fe;
+            display: block;
+            width: 100%;
+            /* 保持畫布的比例，使用最大寬度並讓高度自動調整 */
+            max-width: 600px;
+            margin: 0 auto;
+            cursor: default; /* 預設鼠標 */
+        }
+        .control-panel {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem; /* 稍微縮小間隔 */
+        }
+        .control-panel button {
+            transition: all 0.15s ease-in-out;
+            white-space: nowrap; /* 防止按鈕文字換行 */
+        }
+        /* 速度 v 按鈕使用綠色 */
+        .btn-velocity {
+            background-color: #10b981; /* 綠色 500 */
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
+        }
+        .btn-velocity:hover {
+            background-color: #059669; /* 綠色 600 */
+        }
+        /* 加速度 a 按鈕使用紅色 */
+        .btn-acceleration {
+            background-color: #f87171; /* 紅色 400 */
+            box-shadow: 0 4px 6px -1px rgba(248, 113, 113, 0.4);
+        }
+        .btn-acceleration:hover {
+            background-color: #ef4444; /* 紅色 500 */
+        }
+        /* 水平 SHM 切換按鈕 (藍色系，對應物體顏色) */
+        .btn-h-shm {
+            background-color: #3b82f6; /* 藍色 500 */
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+        }
+        .btn-h-shm:hover {
+            background-color: #2563eb; /* 藍色 600 */
+        }
+        /* 鉛直 SHM 切換按鈕 (橘色系，對應物體顏色) */
+        .btn-v-shm {
+            background-color: #f97316; /* 橘色 500 */
+            box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.4);
+        }
+        .btn-v-shm:hover {
+            background-color: #ea580c; /* 橘色 600 */
+        }
+        /* 角度切換按鈕 (紫色系) */
+        .btn-angle {
+            background-color: #8b5cf6; /* 紫色 500 */
+            box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.4);
+        }
+        .btn-angle:hover {
+            background-color: #7c3aed; /* 紫色 600 */
+        }
+
+        .slider-container {
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f9fafb;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-2xl font-bold text-center text-indigo-800 mb-4">
+            簡諧運動 (SHM) - 圓周運動投影
+        </h1>
+        <p class="text-center text-sm text-gray-600 mb-6">
+            拖拉紅色的 UCM 球或藍色的水平 SHM 球來控制角度和時間。
+        </p>
+
+        <!-- 時間滑桿和顯示 -->
+        <div class="slider-container flex flex-col items-center w-full">
+            <label for="timeSlider" class="text-base font-semibold text-gray-700 mb-2">
+                時間控制: <span id="timeDisplay" class="text-indigo-600 font-bold">0.00 s</span>
+            </label>
+            <input type="range" id="timeSlider" min="0" max="1000" value="0" class="w-full max-w-lg cursor-pointer">
+        </div>
+        
+        <canvas id="shmCanvas" width="600" height="500"></canvas>
+        
+        <div class="control-panel">
+            <button id="toggleButton" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150">
+                暫停
+            </button>
+            <button id="resetButton" class="px-4 py-2 bg-gray-500 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 transition duration-150">
+                重設
+            </button>
+            
+            <!-- 顯示控制組 -->
+            <button id="toggleHShmButton" class="px-4 py-2 btn-h-shm text-white font-semibold rounded-lg shadow-md">
+                隱藏水平 SHM
+            </button>
+            <button id="toggleVShmButton" class="px-4 py-2 btn-v-shm text-white font-semibold rounded-lg shadow-md">
+                隱藏鉛直 SHM
+            </button>
+            <button id="toggleAngleButton" class="px-4 py-2 btn-angle text-white font-semibold rounded-lg shadow-md">
+                隱藏角度 (θ)
+            </button>
+
+            <!-- 向量控制組 -->
+            <button id="toggleVButton" class="px-4 py-2 btn-velocity text-white font-semibold rounded-lg shadow-md">
+                隱藏速度 (v)
+            </button>
+            <button id="toggleAButton" class="px-4 py-2 btn-acceleration text-white font-semibold rounded-lg shadow-md">
+                隱藏加速度 (a)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 將所有程式碼放入 IIFE (立即執行函數表達式) 中，以避免全域變數衝突
+        (function() {
+            // 獲取 Canvas 元素和 2D 渲染環境
+            const canvas = document.getElementById('shmCanvas');
+            const ctx = canvas.getContext('2d');
+            const toggleButton = document.getElementById('toggleButton');
+            const resetButton = document.getElementById('resetButton');
+            
+            // 新增的控制按鈕
+            const toggleVButton = document.getElementById('toggleVButton');
+            const toggleAButton = document.getElementById('toggleAButton');
+            const toggleHShmButton = document.getElementById('toggleHShmButton');
+            const toggleVShmButton = document.getElementById('toggleVShmButton');
+            const toggleAngleButton = document.getElementById('toggleAngleButton');
+            
+            // 新增的滑桿元素
+            const timeSlider = document.getElementById('timeSlider');
+            const timeDisplay = document.getElementById('timeDisplay');
+
+            // 模擬物理常數
+            const R = 120; // 圓周運動半徑 (振幅)
+            const OMEGA = 0.8; // 角速度 (rad/s)
+            const M_RADIUS = 10; // 質點/物體半徑
+            const SPRING_SEGMENTS = 20; // 彈簧段數
+            const TWO_PI = 2 * Math.PI;
+
+            // 向量繪製比例尺
+            const V_SCALE = 0.75; // 速度向量的視覺縮放係數
+            const A_SCALE = 0.75; // 加速度向量的視覺縮放係數
+            const V_MAX = R * OMEGA; // 最大速度 (R*w)
+            const A_MAX = R * OMEGA * OMEGA; // 最大加速度 (R*w^2)
+            
+            // 增加彈簧錨點的額外間距
+            const ANCHOR_OFFSET = 60; 
+
+            // 計算時間週期和滑桿最大時間
+            const PERIOD = TWO_PI / OMEGA; // 週期
+            const CYCLES = 2; // 顯示兩個週期
+            const MAX_TIME = PERIOD * CYCLES; // 滑桿的最大時間值
+
+            // 繪圖中心點 (UCM 的圓心)
+            const UCM_CENTER_X = canvas.width / 2;
+            const UCM_CENTER_Y = 200; 
+
+            // SHM 系統的平衡位置 (Y 座標固定，X 座標固定)
+            const H_SHM_Y = UCM_CENTER_Y + R + 100; // 水平 SHM 的 Y 座標
+            const V_SHM_X = UCM_CENTER_X - R - 100; // 鉛直 SHM 的 X 座標
+
+            // 初始狀態
+            let time = 0;
+            let isRunning = true;
+            let lastTime = 0;
+            let animationFrameId = null;
+            let showVelocity = true; 
+            let showAcceleration = true; 
+            let showHorizontalSHM = true; 
+            let showVerticalSHM = true;   
+            let showAngle = true; 
+            let isDraggingSlider = false; 
+
+            // 拖拉狀態
+            let isDraggingUCM = false; // 拖拉 UCM 紅球
+            let isDraggingHSHM = false; // 拖拉 水平 SHM 藍球
+
+            // --- 輔助函數 ---
+
+            /**
+             * 將滑桿值 (0-1000) 轉換為實際時間 (0-MAX_TIME)
+             */
+            function sliderToTime(sliderValue) {
+                return (sliderValue / 1000) * MAX_TIME;
+            }
+
+            /**
+             * 將實際時間 (0-MAX_TIME) 轉換為滑桿值 (0-1000)
+             */
+            function timeToSlider(currentTime) {
+                const t = currentTime % MAX_TIME; 
+                return Math.round((t / MAX_TIME) * 1000);
+            }
+
+            /**
+             * 獲取滑鼠/觸控在 Canvas 上的座標
+             */
+            function getCanvasCoordinates(event) {
+                const rect = canvas.getBoundingClientRect();
+                let clientX, clientY;
+
+                if (event.touches) {
+                    clientX = event.touches[0].clientX;
+                    clientY = event.touches[0].clientY;
+                } else {
+                    clientX = event.clientX;
+                    clientY = event.clientY;
+                }
+
+                // 考慮 Canvas 的邊界和縮放
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY
+                };
+            }
+
+            /**
+             * 檢查點擊是否在給定圓形範圍內
+             */
+            function isHit(pointX, pointY, targetX, targetY, radius) {
+                const distanceSq = (pointX - targetX) ** 2 + (pointY - targetY) ** 2;
+                return distanceSq <= radius ** 2;
+            }
+            
+            // 其他繪製輔助函數 (drawMathLabel, drawSHMDescription, drawVector, drawSpring) 保持不變
+            
+            /**
+             * 繪製帶有下標的數學標籤
+             */
+            function drawMathLabel(x, y, label, color, textOffset, angle) {
+                ctx.save();
+                ctx.fillStyle = color;
+                
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+
+                const parts = label.split('_');
+                const mainChar = parts[0];
+                const subChar = parts[1] || null;
+
+                ctx.font = 'italic 700 24px Times New Roman'; 
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(mainChar, textOffset, 0);
+
+                if (subChar) {
+                    const mainCharWidth = ctx.measureText(mainChar).width;
+                    ctx.font = 'italic 16px Times New Roman'; 
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top'; 
+                    ctx.fillText(subChar, textOffset + mainCharWidth + 1, 6); 
+                }
+
+                ctx.restore();
+            }
+
+            /**
+             * 繪製 SHM 描述標籤
+             */
+            function drawSHMDescription(x, y, projectionType, axis, color, isVertical) {
+                ctx.save();
+                ctx.fillStyle = color;
+                ctx.textBaseline = 'middle';
+                
+                let currentX = x;
+                let currentY = y;
+                
+                if (isVertical) {
+                    ctx.translate(x, y);
+                    ctx.rotate(-Math.PI / 2);
+                    currentX = 0; 
+                    currentY = 0; 
+                }
+                
+                const part1 = `${projectionType} SHM (`;
+                ctx.font = '18px Inter'; 
+                ctx.fillText(part1, currentX, currentY);
+                
+                const part1Width = ctx.measureText(part1).width;
+                currentX += part1Width;
+
+                const part2 = axis;
+                ctx.font = 'italic 18px "Times New Roman"'; 
+                ctx.fillText(part2, currentX, currentY);
+
+                const part2Width = ctx.measureText(part2).width;
+                currentX += part2Width;
+
+                const part3 = ` 投影)`;
+                ctx.font = '18px Inter';
+                ctx.fillText(part3, currentX, currentY);
+                
+                ctx.restore();
+            }
+
+
+            /**
+             * 繪製向量箭頭
+             */
+            function drawVector(x1, y1, x2, y2, color, label) { 
+                ctx.save();
+                ctx.strokeStyle = color;
+                ctx.fillStyle = color;
+                ctx.lineWidth = 5; 
+                const headLength = 15; 
+                const headAngle = Math.PI / 8; 
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headLength * Math.cos(angle - headAngle), 
+                    y2 - headLength * Math.sin(angle - headAngle)
+                );
+                ctx.lineTo(
+                    x2 - headLength * Math.cos(angle + headAngle), 
+                    y2 - headLength * Math.sin(angle + headAngle)
+                );
+                ctx.closePath();
+                ctx.fill();
+
+                if (label) {
+                    let textOffset = 10; 
+                    let labelX = x2; 
+                    let labelY = y2; 
+                    let textAngle = angle; 
+
+                    if (label.endsWith('_y')) { 
+                        textAngle = 0; 
+                        textOffset = 5; 
+                        labelX += 25; 
+                        labelY += 8; 
+                    } 
+                    else if (label.endsWith('_x')) {
+                        textAngle = 0; 
+                        textOffset = 5;
+                        labelY -= 25; 
+                        
+                        if (x2 < x1) { 
+                            const textLengthEstimate = 55; 
+                            labelX -= textLengthEstimate + 10; 
+                        } else { 
+                            labelX = x2 + 5; 
+                        }
+                    } 
+                    else { 
+                        labelX += Math.cos(textAngle) * 8; 
+                        labelY += Math.sin(textAngle) * 8;
+            
+                        if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+                            textAngle += Math.PI;
+                            textOffset = -textOffset; 
+                        }
+                    }
+
+                    drawMathLabel(labelX, labelY, label, color, textOffset, textAngle);
+                }
+                ctx.restore();
+            }
+
+            /**
+             * 繪製彈簧
+             */
+            function drawSpring(startX, startY, endX, endY, segments, amplitude) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#4f46e5'; 
+                ctx.lineWidth = 3; 
+
+                const dx = endX - startX;
+                const dy = endY - startY;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx); 
+
+                const perpAngle = angle + Math.PI / 2;
+                const perpDx = amplitude * Math.cos(perpAngle);
+                const perpDy = amplitude * Math.sin(perpAngle);
+
+                for (let i = 0; i <= segments; i++) {
+                    const ratio = i / segments;
+                    const targetX = startX + dx * ratio;
+                    const targetY = startY + dy * ratio;
+
+                    if (i === 0) {
+                        ctx.moveTo(targetX, targetY);
+                    } else if (i === segments) {
+                        ctx.lineTo(endX, endY);
+                    } else {
+                        if (i % 2 === 1) {
+                            ctx.lineTo(targetX + perpDx, targetY + perpDy);
+                        } else {
+                            ctx.lineTo(targetX - perpDx, targetY - perpDy);
+                        }
+                    }
+                }
+
+                ctx.stroke();
+            }
+
+            // --- 繪製主函數 ---
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // 1. 計算當前位置和角度
+                const theta = OMEGA * time; 
+                const currentTheta = theta % TWO_PI; // 用於顯示的角度 (0-2PI)
+                
+                const cosTheta = Math.cos(theta);
+                const sinTheta = Math.sin(theta);
+
+                // UCM 質點位置
+                const x_ucm = UCM_CENTER_X + R * cosTheta;
+                const y_ucm = UCM_CENTER_Y - R * sinTheta; // Y 軸向下
+
+                // SHM 質點位置
+                const x_shm = x_ucm; // 水平投影
+                const y_vshm = y_ucm; // 鉛直投影
+
+                // 2. 物理量計算 (速度 v, 加速度 a)
+                const V_ucm_x = -V_MAX * sinTheta; 
+                const V_ucm_y = -V_MAX * cosTheta; 
+                const A_ucm_x = -A_MAX * cosTheta; 
+                const A_ucm_y = A_MAX * sinTheta; 
+
+                // 3. 繪製 UCM (等速圓周運動)
+                
+                // 圓軌道
+                ctx.beginPath();
+                ctx.arc(UCM_CENTER_X, UCM_CENTER_Y, R, 0, TWO_PI);
+                ctx.strokeStyle = '#3b82f6'; 
+                ctx.lineWidth = 2; 
+                ctx.stroke();
+                
+                // 圓心
+                ctx.fillStyle = '#6366f1'; 
+                ctx.fillRect(UCM_CENTER_X - 3, UCM_CENTER_Y - 3, 6, 6); 
+
+                // 角度扇形和文字
+                if (showAngle) {
+                    const angleRadius = 20; 
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(UCM_CENTER_X, UCM_CENTER_Y);
+                    ctx.arc(UCM_CENTER_X, UCM_CENTER_Y, angleRadius, 0, -currentTheta, true);
+                    ctx.closePath();
+                    ctx.fillStyle = 'rgba(139, 92, 246, 0.2)'; 
+                    ctx.fill();
+                    ctx.strokeStyle = '#8b5cf6'; 
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // 水平參考線
+                    ctx.beginPath();
+                    ctx.moveTo(UCM_CENTER_X, UCM_CENTER_Y);
+                    ctx.lineTo(UCM_CENTER_X + angleRadius + 10, UCM_CENTER_Y);
+                    ctx.strokeStyle = '#94a3b8'; 
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // 文字
+                    const degrees = Math.round((currentTheta * 180) / Math.PI);
+                    ctx.fillStyle = '#6d28d9'; 
+                    ctx.font = 'bold 16px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    const textAngle = -currentTheta / 2;
+                    const textDist = angleRadius + 30; 
+                    const textX = UCM_CENTER_X + textDist * Math.cos(textAngle);
+                    const textY = UCM_CENTER_Y + textDist * Math.sin(textAngle);
+                    
+                    ctx.save();
+                    ctx.font = 'italic 18px "Times New Roman"';
+                    ctx.fillText('θ', textX - 25, textY);
+                    ctx.font = 'bold 16px Inter';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`= ${degrees}°`, textX - 15, textY);
+                    ctx.restore();
+                }
+
+                // 半徑線
+                ctx.beginPath();
+                ctx.moveTo(UCM_CENTER_X, UCM_CENTER_Y);
+                ctx.lineTo(x_ucm, y_ucm);
+                ctx.strokeStyle = '#93c5fd'; 
+                ctx.lineWidth = 1; 
+                ctx.stroke();
+
+                // UCM 質點 (紅色)
+                ctx.beginPath();
+                ctx.arc(x_ucm, y_ucm, M_RADIUS, 0, TWO_PI);
+                ctx.fillStyle = '#ef4444'; 
+                ctx.fill();
+                ctx.strokeStyle = '#b91c1c';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                
+                // 標註 UCM
+                ctx.fillStyle = '#4b5563';
+                ctx.font = 'bold 18px Inter'; 
+                ctx.textAlign = 'center'; 
+                ctx.fillText('圓周運動 (UCM)', UCM_CENTER_X, UCM_CENTER_Y - R - 40); 
+                ctx.textAlign = 'left'; 
+                
+                // 向量和投影線計算
+                const X_V_UCM_TIP = x_ucm + V_ucm_x * V_SCALE;
+                const Y_V_UCM_TIP = y_ucm + V_ucm_y * V_SCALE;
+                const X_A_UCM_TIP = x_ucm + A_ucm_x * A_SCALE;
+                const Y_A_UCM_TIP = y_ucm + A_ucm_y * A_SCALE;
+
+                const H_PROJ_Y = H_SHM_Y;
+                const V_PROJ_X = V_SHM_X;
+
+                ctx.setLineDash([3, 3]);
+                ctx.lineWidth = 2; 
+
+                // 向量投影線... (略, 保持與前一版本一致)
+                if (showVelocity) {
+                    if (showHorizontalSHM) {
+                        ctx.strokeStyle = '#059669'; 
+                        ctx.beginPath(); ctx.moveTo(X_V_UCM_TIP, Y_V_UCM_TIP); ctx.lineTo(X_V_UCM_TIP, H_PROJ_Y); ctx.stroke();
+                    }
+                    if (showVerticalSHM) {
+                        ctx.strokeStyle = '#059669'; 
+                        ctx.beginPath(); ctx.moveTo(X_V_UCM_TIP, Y_V_UCM_TIP); ctx.lineTo(V_PROJ_X, Y_V_UCM_TIP); ctx.stroke();
+                    }
+                }
+                
+                if (showAcceleration) {
+                    if (showHorizontalSHM) {
+                        ctx.strokeStyle = '#dc2626'; 
+                        ctx.beginPath(); ctx.moveTo(X_A_UCM_TIP, Y_A_UCM_TIP); ctx.lineTo(X_A_UCM_TIP, H_PROJ_Y); ctx.stroke();
+                    }
+                    if (showVerticalSHM) {
+                        ctx.strokeStyle = '#dc2626'; 
+                        ctx.beginPath(); ctx.moveTo(X_A_UCM_TIP, Y_A_UCM_TIP); ctx.lineTo(V_PROJ_X, Y_A_UCM_TIP); ctx.stroke();
+                    }
+                }
+                
+                ctx.setLineDash([]); 
+
+                // UCM 速度 (v)
+                if (showVelocity) {
+                    drawVector(x_ucm, y_ucm, X_V_UCM_TIP, Y_V_UCM_TIP, '#059669', 'v');
+                }
+                
+                // UCM 加速度 (a)
+                if (showAcceleration) {
+                    drawVector(x_ucm, y_ucm, X_A_UCM_TIP, Y_A_UCM_TIP, '#dc2626', 'a'); 
+                }
+
+                // 4. 繪製位置投影虛線 (UCM 到 SHM)
+                ctx.strokeStyle = '#4ade80'; 
+                ctx.lineWidth = 2; 
+                ctx.setLineDash([5, 5]);
+
+                if (showHorizontalSHM) {
+                    ctx.beginPath();
+                    ctx.moveTo(x_ucm, y_ucm);
+                    ctx.lineTo(x_ucm, H_SHM_Y - M_RADIUS);
+                    ctx.stroke();
+                }
+
+                if (showVerticalSHM) {
+                    ctx.beginPath();
+                    ctx.moveTo(x_ucm, y_ucm);
+                    ctx.lineTo(V_SHM_X + M_RADIUS, y_vshm);
+                    ctx.stroke();
+                }
+
+                ctx.setLineDash([]); 
+
+                // 5. 繪製水平 SHM (X 軸投影)
+                if (showHorizontalSHM) {
+                    const H_WALL_X = UCM_CENTER_X - R - ANCHOR_OFFSET;
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillRect(H_WALL_X, H_SHM_Y - 20, 10, 40);
+
+                    const H_SPRING_START_X = H_WALL_X + 10;
+                    const H_SPRING_START_Y = H_SHM_Y;
+                    const H_SPRING_END_X = x_shm - M_RADIUS;
+                    const H_SPRING_END_Y = H_SHM_Y;
+                    drawSpring(H_SPRING_START_X, H_SPRING_START_Y, H_SPRING_END_X, H_SPRING_END_Y, SPRING_SEGMENTS, 8);
+
+                    // 藍球
+                    ctx.beginPath();
+                    ctx.arc(x_shm, H_SHM_Y, M_RADIUS, 0, TWO_PI);
+                    ctx.fillStyle = '#2563eb'; 
+                    ctx.fill();
+                    ctx.strokeStyle = '#1d4ed8';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    
+                    if (showVelocity) {
+                        drawVector(x_shm, H_SHM_Y, x_shm + V_ucm_x * V_SCALE, H_SHM_Y, '#059669', 'v_x');
+                    }
+
+                    if (showAcceleration) {
+                        drawVector(x_shm, H_SHM_Y, x_shm + A_ucm_x * A_SCALE, H_SHM_Y, '#dc2626', 'a_x');
+                    }
+
+                    ctx.setLineDash([2, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(UCM_CENTER_X, H_SHM_Y - 20);
+                    ctx.lineTo(UCM_CENTER_X, H_SHM_Y + 20);
+                    ctx.strokeStyle = '#9ca3af';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    drawSHMDescription(UCM_CENTER_X - 50, H_SHM_Y + 40, '水平', 'x', '#4b5563', false);
+                }
+                
+                
+                // 6. 繪製鉛直 SHM (Y 軸投影)
+                if (showVerticalSHM) {
+                    const V_CEILING_Y = UCM_CENTER_Y - R - ANCHOR_OFFSET;
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillRect(V_SHM_X - 20, V_CEILING_Y, 40, 10);
+
+                    const V_SPRING_START_X = V_SHM_X;
+                    const V_SPRING_START_Y = V_CEILING_Y + 10;
+                    const V_SPRING_END_X = V_SHM_X;
+                    const V_SPRING_END_Y = y_vshm - M_RADIUS;
+                    drawSpring(V_SPRING_START_X, V_SPRING_START_Y, V_SPRING_END_X, V_SPRING_END_Y, SPRING_SEGMENTS, 8);
+
+                    // 橘球
+                    ctx.beginPath();
+                    ctx.arc(V_SHM_X, y_vshm, M_RADIUS, 0, TWO_PI);
+                    ctx.fillStyle = '#f97316';
+                    ctx.fill();
+                    ctx.strokeStyle = '#ea580c';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    if (showVelocity) {
+                        drawVector(V_SHM_X, y_vshm, V_SHM_X, y_vshm + V_ucm_y * V_SCALE, '#059669', 'v_y');
+                    }
+
+                    if (showAcceleration) {
+                        drawVector(V_SHM_X, y_vshm, V_SHM_X, y_vshm + A_ucm_y * A_SCALE, '#dc2626', 'a_y');
+                    }
+
+                    ctx.setLineDash([2, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(V_SHM_X - 20, UCM_CENTER_Y);
+                    ctx.lineTo(V_SHM_X + 20, UCM_CENTER_Y);
+                    ctx.strokeStyle = '#9ca3af';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    drawSHMDescription(V_SHM_X - 40, UCM_CENTER_Y + 60, '鉛直', 'y', '#4b5563', true);
+                }
+                
+                // 7. 更新時間顯示和滑桿位置
+                timeDisplay.textContent = time.toFixed(2) + ' s';
+                if (!isDraggingSlider) {
+                    timeSlider.value = timeToSlider(time);
+                }
+            }
+
+            // --- 拖拉邏輯 ---
+
+            function handleDragStart(e) {
+                const { x, y } = getCanvasCoordinates(e);
+
+                const theta = OMEGA * time; 
+                const x_ucm = UCM_CENTER_X + R * Math.cos(theta);
+                const y_ucm = UCM_CENTER_Y - R * Math.sin(theta); 
+                const x_shm = x_ucm; 
+                const y_hshm = H_SHM_Y;
+
+                // 檢查是否點擊 UCM 紅球
+                if (isHit(x, y, x_ucm, y_ucm, M_RADIUS)) {
+                    isDraggingUCM = true;
+                }
+                // 檢查是否點擊 水平 SHM 藍球
+                else if (showHorizontalSHM && isHit(x, y, x_shm, y_hshm, M_RADIUS)) {
+                    isDraggingHSHM = true;
+                }
+
+                if (isDraggingUCM || isDraggingHSHM) {
+                    // 暫停動畫
+                    if (isRunning) toggleAnimation();
+                    canvas.style.cursor = 'grabbing';
+                }
+            }
+
+            function handleDragMove(e) {
+                if (!isDraggingUCM && !isDraggingHSHM) return;
+                
+                e.preventDefault(); 
+                const { x: mouseX, y: mouseY } = getCanvasCoordinates(e);
+
+                let newTheta;
+                
+                if (isDraggingUCM) {
+                    // 拖拉 UCM 紅球：直接計算新角度
+                    const dx = mouseX - UCM_CENTER_X;
+                    const dy = UCM_CENTER_Y - mouseY; // Y 軸反轉
+                    
+                    newTheta = Math.atan2(dy, dx); 
+                    if (newTheta < 0) newTheta += TWO_PI; // 轉換到 0 到 2*pi
+                    
+                } else if (isDraggingHSHM) {
+                    // 拖拉水平 SHM 藍球：根據水平位置計算角度
+                    
+                    // 1. 限制 x_shm 範圍
+                    let clampedX = Math.min(UCM_CENTER_X + R, Math.max(UCM_CENTER_X - R, mouseX));
+                    
+                    // 2. 計算 cos(theta)
+                    let newCosTheta = (clampedX - UCM_CENTER_X) / R;
+                    
+                    // 3. 計算上半圓角度 (0 到 pi)
+                    let newThetaPrime = Math.acos(newCosTheta); 
+                    
+                    // 4. 根據當前狀態判斷是上半圓還是下半圓
+                    const currentTheta = OMEGA * time;
+                    const currentSinTheta = Math.sin(currentTheta);
+                    
+                    if (currentSinTheta >= 0) {
+                        // 當前在上半圓或水平軸上 (Y_UCM <= UCM_CENTER_Y)
+                        newTheta = newThetaPrime; // 0 到 pi
+                    } else { 
+                        // 當前在下半圓 (Y_UCM > UCM_CENTER_Y)
+                        newTheta = TWO_PI - newThetaPrime; // pi 到 2*pi
+                    }
+                }
+
+                // 更新時間
+                if (newTheta !== undefined) {
+                    const timeInCycle = newTheta / OMEGA;
+                    const numCycles = Math.floor(time / PERIOD);
+                    
+                    time = numCycles * PERIOD + timeInCycle;
+                    if (time > MAX_TIME) time -= PERIOD;
+
+                    draw();
+                }
+            }
+
+            function handleDragEnd() {
+                isDraggingUCM = false;
+                isDraggingHSHM = false;
+                canvas.style.cursor = 'default';
+            }
+
+
+            // --- 事件監聽與動畫控制 ---
+
+            let animationRunning = true; 
+
+            function animate(currentTime) {
+                if (!animationRunning) return; 
+                
+                if (isRunning && !isDraggingSlider) {
+                    const deltaTime = (currentTime - lastTime) / 1000; 
+                    time += deltaTime; 
+                    
+                    if (time > MAX_TIME) {
+                        time %= MAX_TIME; 
+                    }
+                    
+                    draw(); 
+                } else if (isDraggingSlider || isDraggingUCM || isDraggingHSHM) {
+                    draw(); 
+                }
+                
+                lastTime = currentTime;
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+            function toggleAnimation() {
+                if (isDraggingSlider || isDraggingUCM || isDraggingHSHM) return;
+
+                isRunning = !isRunning;
+                toggleButton.textContent = isRunning ? '暫停' : '繼續';
+                
+                if (isRunning && !animationFrameId) {
+                    animationRunning = true;
+                    lastTime = performance.now(); 
+                    animate(lastTime);
+                } else if (!isRunning) {
+                    draw();
+                }
+            }
+
+            function resetAnimation() {
+                time = 0;
+                lastTime = 0; 
+                timeSlider.value = 0; 
+                draw(); 
+            }
+
+            function toggleVelocity() {
+                showVelocity = !showVelocity;
+                toggleVButton.textContent = showVelocity ? '隱藏速度 (v)' : '顯示速度 (v)';
+                draw(); 
+            }
+            
+            function toggleAcceleration() {
+                showAcceleration = !showAcceleration;
+                toggleAButton.textContent = showAcceleration ? '隱藏加速度 (a)' : '顯示加速度 (a)';
+                draw(); 
+            }
+
+            function toggleHorizontalSHM() {
+                showHorizontalSHM = !showHorizontalSHM;
+                toggleHShmButton.textContent = showHorizontalSHM ? '隱藏水平 SHM' : '顯示水平 SHM';
+                draw();
+            }
+
+            function toggleVerticalSHM() {
+                showVerticalSHM = !showVerticalSHM;
+                toggleVShmButton.textContent = showVerticalSHM ? '隱藏鉛直 SHM' : '顯示鉛直 SHM';
+                draw();
+            }
+
+            function toggleAngle() {
+                showAngle = !showAngle;
+                toggleAngleButton.textContent = showAngle ? '隱藏角度 (θ)' : '顯示角度 (θ)';
+                draw();
+            }
+
+            // --- 滑桿事件監聽器 ---
+
+            timeSlider.addEventListener('mousedown', () => {
+                isDraggingSlider = true;
+                isRunning = false; 
+                toggleButton.textContent = '繼續'; 
+            });
+
+            timeSlider.addEventListener('mouseup', () => {
+                isDraggingSlider = false;
+            });
+
+            timeSlider.addEventListener('input', (e) => {
+                time = sliderToTime(parseInt(e.target.value, 10));
+                draw(); 
+            });
+
+            // --- 拖拉事件監聽器 ---
+            canvas.addEventListener('mousedown', handleDragStart);
+            canvas.addEventListener('mousemove', handleDragMove);
+            window.addEventListener('mouseup', handleDragEnd); 
+            
+            // 觸控事件
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) handleDragStart(e);
+            }, { passive: false });
+            canvas.addEventListener('touchmove', handleDragMove, { passive: false });
+            window.addEventListener('touchend', handleDragEnd);
+
+
+            toggleButton.addEventListener('click', toggleAnimation);
+            resetButton.addEventListener('click', resetAnimation);
+            toggleVButton.addEventListener('click', toggleVelocity);
+            toggleAButton.addEventListener('click', toggleAcceleration);
+            toggleHShmButton.addEventListener('click', toggleHorizontalSHM);
+            toggleVShmButton.addEventListener('click', toggleVerticalSHM);
+            toggleAngleButton.addEventListener('click', toggleAngle);
+
+            // 啟動動畫
+            window.onload = function() {
+                animate(performance.now());
+            };
+        })(); // 立即執行函數表達式結束
+
+    </script>
+</body>
+</html>
