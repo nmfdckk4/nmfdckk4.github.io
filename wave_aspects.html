@@ -196,7 +196,7 @@
         const originTarget = new THREE.Vector3(0, 0, 0);
         
         // 調整相機位置以獲得良好的初始視角
-        camera.position.set(T_MAX * 1.8, 0, 0);
+        camera.position.set(0, 0, X_MAX * 1.8);
         camera.lookAt(originTarget);
 
         // 渲染器
@@ -523,4 +523,5 @@
     </script>
 </body>
 </html>
+
 
