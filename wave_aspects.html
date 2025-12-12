@@ -4,16 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D 波浪時空曲面模擬</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- OrbitControls for camera control -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <!-- MathJax for rendering equations in the UI -->
     <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
     <script>
-        window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+        window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)'] ] } };
     </script>
 
     <style>
@@ -34,7 +30,6 @@
         
         <div id="waveCanvas" class="bg-gray-800 rounded-xl mb-6 shadow-2xl overflow-hidden relative">
             <div id="labelsContainer" class="absolute inset-0 pointer-events-none">
-                <!-- 軸標籤 (透過 JavaScript 投影到 2D 螢幕) -->
                 <div id="xLabel" class="axis-label bg-red-600">x (位置)</div>
                 <div id="yLabel" class="axis-label bg-green-600">y (位移)</div>
                 <div id="tLabel" class="axis-label bg-blue-600">t (時間)</div>
@@ -66,11 +61,11 @@
                 <button id="toggleSurface" class="w-full py-3 rounded-lg font-bold text-white transition duration-200 shadow-lg bg-gray-600 hover:bg-gray-700">
                     顯示曲面
                 </button>
-                <a href="index.html" class="
-        	    bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-150
-    	        ">返回主目錄</a>
-        </div>
                 
+                <a href="index.html" class="
+                    w-full block text-center 
+                    bg-blue-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-150
+                ">返回主目錄</a>
             </div>
 
             <div class="control-card space-y-3">
@@ -117,7 +112,7 @@
     const T_STEP = T_MAX / T_SEGMENTS;
     
     // 相機正交投影大小 (決定視圖的縮放比例)
-    const ORTHO_SIZE = 6.7; 
+    const ORTHO_SIZE = 4; 
     
     // T 軸刻度標籤的 3D 偏移量 (沿 Z 軸，負值表示遠離 X 軸)
     const T_TICK_LABEL_OFFSET = -0.5; // <-- 調整這裡的數值來控制時間刻度數字的距離
@@ -125,11 +120,11 @@
     // 軸標籤的 3D 終端位置 (調整這些值來控制 X, Y, T 軸標籤的距離)
     const AXIS_LABEL_POSITIONS = {
         // X (Position) 軸沿 世界Z 軸 (X_MAX + [距離偏移量])
-        x: new THREE.Vector3(0, 0, X_MAX + 1), // <-- 調整這裡的 1.5
+        x: new THREE.Vector3(0, 0, X_MAX + 1.5), // <-- 調整這裡的 1.5
         // Y (Displacement) 軸沿 世界Y 軸 (A * 2.5 + [距離偏移量])
-        y: new THREE.Vector3(X_MIN, A * 2.5 + 0.5, 0), // <-- 調整這裡的 0.8
+        y: new THREE.Vector3(X_MIN, A * 2.5 + 0.8, 0), // <-- 調整這裡的 0.8
         // T (Time) 軸沿 世界X 軸 (T_MAX + [距離偏移量])
-        t: new THREE.Vector3(T_MAX + 1, 0, 0), // <-- 調整這裡的 1.5
+        t: new THREE.Vector3(T_MAX + 1.5, 0, 0), // <-- 調整這裡的 1.5
     };
 
     // DOM 元素 (快取)
@@ -196,10 +191,10 @@
         // 相機 (正交投影)
         const aspect = $canvasContainer.clientWidth / $canvasContainer.clientHeight;
         camera = new THREE.OrthographicCamera(-ORTHO_SIZE * aspect, ORTHO_SIZE * aspect, ORTHO_SIZE, -ORTHO_SIZE, 0.1, 100);
-        const originTarget = new THREE.Vector3(T_MAX*0.45, 0, -X_MAX*1.8);
+        const originTarget = new THREE.Vector3(T_MAX * 0.5, 0, -X_MAX * 0.5);
         
-        // 調整相機位置以獲得良好的初始視角
-        camera.position.set(T_MAX * 0.45, 0, X_MAX * 1.8);
+        // 【調整攝影機初始距離的區域】
+        camera.position.set(T_MAX * 0.5, 0, X_MAX * 0.5);
         camera.lookAt(originTarget);
 
         // 渲染器
@@ -210,8 +205,7 @@
         // 控制器
         controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = false; // 停用阻尼：停止拖拉後立即停止轉動
-        // controls.dampingFactor = 0.05; // 停用阻尼後此參數無效
-        controls.rotateSpeed = 0.1; 
+        controls.rotateSpeed = 0.2; 
         controls.target.copy(originTarget);
         controls.update();
 
@@ -464,6 +458,18 @@
         renderer.render(scene, camera);
     }
 
+    // 輔助函數：如果正在播放，則立即暫停動畫並更新 UI 狀態
+    function pauseAnimation() {
+        if (isPlaying) {
+            // 執行暫停邏輯
+            isPlaying = false;
+            $playStateText.textContent = '播放';
+            // 確保按鈕切換回紅色 (播放狀態)
+            $togglePlay.classList.remove('bg-green-600', 'hover:bg-green-700');
+            $togglePlay.classList.add('bg-red-600', 'hover:bg-red-700');
+        }
+    }
+
     // --- 7. 事件監聽器 ---
     function setupEventListeners() {
         $togglePlay.addEventListener('click', () => {
@@ -490,12 +496,15 @@
             }
         });
 
-        // 處理時間滑桿輸入：滑動時強制暫停動畫
+        // NEW: 在拖拉時間滑桿的瞬間，立即暫停動畫
+        $timeSlider.addEventListener('mousedown', pauseAnimation);
+        $timeSlider.addEventListener('touchstart', pauseAnimation);
+
+        // 處理時間滑桿輸入：滑動時
         $timeSlider.addEventListener('input', (e) => {
-            if (isPlaying) $togglePlay.click();
+            // 不再需要呼叫暫停，因為 mousedown/touchstart 已經處理
             currentTime = parseFloat(e.target.value);
             $timeValue.textContent = currentTime.toFixed(2);
-            // 不需要手動呼叫 updateLines，因為 animate 循環會自動在下一幀更新
         });
 
         // 處理質點位置滑桿輸入
@@ -526,7 +535,4 @@
     </script>
 </body>
 </html>
-
-
-
-
+```eof
