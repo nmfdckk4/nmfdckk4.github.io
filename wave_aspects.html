@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>波的時間觀點與空間觀點</title>
+    <title>波的時間與空間觀點</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js Library -->
@@ -21,19 +21,20 @@
         /* 確保畫布容器填滿可用空間 */
         #waveCanvas { width: 100%; height: 70vh; display: block; } 
         .control-card { background-color: white; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        /* 軸標籤的通用樣式 */
         .axis-label { position: absolute; font-size: 14px; font-weight: bold; color: white; padding: 2px 6px; border-radius: 4px; transform: translate(-50%, -50%); z-index: 10; }
-        /* T軸刻度標籤 */
+        /* T軸刻度標籤 (用於時間軸) */
         .t-axis-label { position: absolute; transform: translate(-100%, -50%); pointer-events: none; z-index: 9; }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen">
 
     <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-extrabold text-center mb-6 text-indigo-700">波隨時間與空間之變化 ($y(x, t)$)</h1>
+        <h1 class="text-3xl font-extrabold text-center mb-6 text-indigo-700">波隨時間與位置變化($y(x, t)$)</h1>
         
         <div id="waveCanvas" class="bg-gray-800 rounded-xl mb-6 shadow-2xl overflow-hidden relative">
             <div id="labelsContainer" class="absolute inset-0 pointer-events-none">
-                <!-- 軸標籤 -->
+                <!-- 軸標籤 (透過 JavaScript 投影到 2D 螢幕) -->
                 <div id="xLabel" class="axis-label bg-red-600">x (位置)</div>
                 <div id="yLabel" class="axis-label bg-green-600">y (位移)</div>
                 <div id="tLabel" class="axis-label bg-blue-600">t (時間)</div>
@@ -48,9 +49,7 @@
                     <span id="playStateText">播放</span> 動畫 (綠球沿 x 軸傳播 & 黃球沿紅線移動)
                 </button>
                 
-                
-        
-        <div class="space-y-2">
+                <div class="space-y-2">
                     <label for="particleXInput" class="block text-base font-medium text-gray-700">
                         追蹤質點軌跡位置 (x軸): <span id="particleXValue" class="font-mono text-indigo-600">0.00</span>
                     </label>
@@ -61,11 +60,9 @@
                     <label for="timeSlider" class="block text-base font-medium text-gray-700">
                         當前時間 (t軸): <span id="timeValue" class="font-mono text-indigo-600">0.00</span> s
                     </label>
-                    <!-- T_MAX 調整為 9.0，這裡設定為 9.0 以保持一致性 -->
                     <input type="range" id="timeSlider" min="0" max="9.0" step="0.01" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                 </div>
 
-        <!-- 初始為隱藏，所以按鈕顯示為「顯示曲面」，且為灰色 -->
                 <button id="toggleSurface" class="w-full py-3 rounded-lg font-bold text-white transition duration-200 shadow-lg bg-gray-600 hover:bg-gray-700">
                     顯示曲面
                 </button>
@@ -78,420 +75,448 @@
                 <p class="text-sm text-gray-700 font-bold">波函數：$y(x, t) = A \sin(kx - \omega t)$</p>
                 <ul class="text-base text-gray-600 list-disc ml-5 space-y-1">
                     <li class="font-bold text-black-700">黑色小球：座標原點 $(0, 0, 0)$。</li>
-                    <li class="font-bold text-green-700">綠色小球: $t$ 時刻的瞬時波形（沿 x-Position 軸傳播）。</li>
-                    <li class="font-bold text-red-700">紅線: 質點在 $x_p$ 處的完整歷史軌跡（沿 t-Time 軸延伸）。</li>
+                    <li class="font-bold text-green-700">綠色小球群: $t$ 時刻的**瞬時波形**（沿 x-Position 軸傳播）。</li>
+                    <li class="font-bold text-red-700">紅線: 質點在 $x_p$ 處的完整**歷史軌跡**（沿 t-Time 軸延伸）。</li>
                     <li class="font-bold text-yellow-700">黃球: 顯示紅線上的當前時間 $t$ 所在的位置。</li>
                 </ul>
-                <p class="mt-4 text-sm text-indigo-700 font-medium">提示：請旋轉 3D 圖形，觀察綠色小球群如何在曲面上**沿著x軸傳播**，以及黃球如何t軸（紅線）移動。</p>
+                <p class="mt-4 text-sm text-indigo-700 font-medium">提示：請旋轉 3D 圖形，觀察綠色小球群如何在曲面上**沿著時間軸 $t$** 移動，同時黃球在紅線軌跡上運動。</p>
             </div>
         </div>
     </div>
 
     <script>
 (function() {
-        // --- 1. 參數與全域變數 ---
-        let scene, camera, renderer, controls, surfaceMesh, particleTrackLine, particleMarker; 
-        const snapshotParticles = []; 
-        const tAxisLabels = []; 
+    // --- 1. 參數與全域變數 ---
+    let scene, camera, renderer, controls, surfaceMesh, particleTrackLine, particleMarker; 
+    const snapshotParticles = []; 
+    const tAxisLabels = []; 
+    
+    let isPlaying = false; 
+    let currentTime = 0;
+    let particleX = 0; // 追蹤質點的固定 X 座標
+
+    // 波參數 (A=振幅, k=波數, omega=角頻率)
+    const A = 1.0;
+    const k = Math.PI / 2; // 波長 \lambda = 2\pi / k = 4.0
+    const omega = Math.PI; // 週期 T = 2\pi / \omega = 2.0
+
+    // 3D 模擬範圍與細節 (T 軸對應世界 X, X 軸對應世界 Z)
+    const X_MIN = 0;
+    const X_MAX = 12.5; // 位置範圍 (世界 Z 軸)
+    const T_MAX = 9.0;  // 時間範圍 (世界 X 軸)
+    const T_MIN = 0.0;  
+    
+    // 網格細節
+    const X_SEGMENTS_SURFACE = 100;
+    const T_SEGMENTS = 100;
+    const X_SEGMENTS_PARTICLES = 50; // 瞬時波形的粒子數量
+    const X_STEP_PARTICLES = X_MAX / X_SEGMENTS_PARTICLES;
+    const T_STEP = T_MAX / T_SEGMENTS;
+    
+    // 相機正交投影大小 (決定視圖的縮放比例)
+    const ORTHO_SIZE = 4; 
+    
+    // 軸標籤的 3D 終端位置
+    const AXIS_LABEL_POSITIONS = {
+        // X (Position) 軸沿 世界Z 軸
+        x: new THREE.Vector3(0, 0, X_MAX + 1.5), 
+        // Y (Displacement) 軸沿 世界Y 軸
+        y: new THREE.Vector3(X_MIN, A * 2.5 + 0.8, 0),
+        // T (Time) 軸沿 世界X 軸
+        t: new THREE.Vector3(T_MAX + 1.5, 0, 0),
+    };
+
+    // DOM 元素 (快取)
+    const $canvasContainer = document.getElementById('waveCanvas');
+    const $togglePlay = document.getElementById('togglePlay');
+    const $toggleSurface = document.getElementById('toggleSurface');
+    const $playStateText = document.getElementById('playStateText');
+    const $timeSlider = document.getElementById('timeSlider');
+    const $timeValue = document.getElementById('timeValue');
+    const $particleXInput = document.getElementById('particleXInput');
+    const $particleXValue = document.getElementById('particleXValue');
+    const $labelsContainer = document.getElementById('labelsContainer');
+    const $xLabel = document.getElementById('xLabel');
+    const $yLabel = document.getElementById('yLabel');
+    const $tLabel = document.getElementById('tLabel');
+
+
+    // --- 2. 核心波函數 ---
+    function getWaveDisplacement(x, t) {
+        // y(x, t) = A * sin(kx - omega*t)
+        return A * Math.sin(k * x - omega * t);
+    }
+    
+    // --- 輔助函數：創建帶有粗軸身的座標軸 ---
+    function createThickAxis(direction, length, color, shaftRadius, headLength, headRadius) {
+        const axisGroup = new THREE.Group();
+        // 使用 MeshPhongMaterial 來響應平行光和環境光
+        const material = new THREE.MeshPhongMaterial({ color: color });
         
-        let isPlaying = false; 
-        let currentTime = 0;
-        let particleX = 0;
-
-        // 波參數
-        const A = 1.0;
-        const k = Math.PI / 2; // 波數 k = 2\pi / \lambda
-        const omega = Math.PI; // 角頻率 \omega = 2\pi / T
-        const PERIOD = 2.0; // 週期 T = 2\pi / \omega = 2.0
-
-        // 3D 模擬範圍與細節
-        const X_MIN = 0;
-        const X_MAX = 12.5; // 位置範圍 (世界 Z 軸)
-        const T_MAX = 9.0;  // 時間範圍 (世界 X 軸)
-        const T_MIN = 0.0;  
-        const X_SEGMENTS_SURFACE = 100;
-        const T_SEGMENTS = 100;
-        const X_SEGMENTS_PARTICLES = 50;
-        const X_STEP_PARTICLES = X_MAX / X_SEGMENTS_PARTICLES;
-        const T_STEP = T_MAX / T_SEGMENTS;
+        // 1. 軸身 (Cylinder)
+        const shaftLength = length - headLength;
+        const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
+        const shaftMesh = new THREE.Mesh(shaftGeometry, material);
         
-        // 相機正交投影大小
-        const ORTHO_SIZE = 4; 
-        const AXIS_LABEL_POSITIONS = {
-            // X (Position) 軸沿 世界Z 軸
-            x: new THREE.Vector3(0, 0, X_MAX + 1.5), 
-            // Y (Displacement) 軸沿 世界Y 軸
-            y: new THREE.Vector3(X_MIN, A * 2.5 + 0.8, 0),
-            // T (Time) 軸沿 世界X 軸
-            t: new THREE.Vector3(T_MAX + 1.5, 0, 0),
-        };
+        // 將柱體網格向上平移，使其基底位於 (0,0,0) 處
+        shaftMesh.position.y = shaftLength / 2;
+        
+        // 2. 箭頭 (Cone)
+        const headGeometry = new THREE.ConeGeometry(headRadius, headLength, 12);
+        const headMesh = new THREE.Mesh(headGeometry, material);
+        
+        // 將箭頭定位在軸身末端
+        headMesh.position.y = shaftLength + headLength / 2; 
 
-        // DOM 元素 (快取)
-        const $canvasContainer = document.getElementById('waveCanvas');
-        const $togglePlay = document.getElementById('togglePlay');
-        const $toggleSurface = document.getElementById('toggleSurface');
-        const $playStateText = document.getElementById('playStateText');
-        const $timeSlider = document.getElementById('timeSlider');
-        const $timeValue = document.getElementById('timeValue');
-        const $particleXInput = document.getElementById('particleXInput');
-        const $particleXValue = document.getElementById('particleXValue');
-        const $labelsContainer = document.getElementById('labelsContainer');
-        const $xLabel = document.getElementById('xLabel');
-        const $yLabel = document.getElementById('yLabel');
-        const $tLabel = document.getElementById('tLabel');
-
-
-        // --- 2. 核心波函數 ---
-        function getWaveDisplacement(x, t) {
-            // y(x, t) = A * sin(kx - omega*t)
-            return A * Math.sin(k * x - omega * t);
+        axisGroup.add(shaftMesh);
+        axisGroup.add(headMesh);
+        
+        // 根據方向旋轉軸組，使其對齊正確的軸線
+        if (direction === 'X') {
+            axisGroup.rotation.z = -Math.PI / 2; // 對齊 世界X 軸 (時間 t, 藍色)
+        } else if (direction === 'Z') {
+            axisGroup.rotation.x = Math.PI / 2; // 對齊 世界Z 軸 (位置 x, 紅色)
         }
+        // Y 軸 (世界Y, 位移 y, 綠色) 保持不變 (Cylinder 預設方向)
         
-        // --- 輔助函數：創建帶有粗軸身的座標軸 ---
-        function createThickAxis(direction, length, color, shaftRadius, headLength, headRadius) {
-            const axisGroup = new THREE.Group();
-            const material = new THREE.MeshPhongMaterial({ color: color });
-            
-            // 1. 軸身 (Cylinder)
-            const shaftLength = length - headLength;
-            const shaftGeometry = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftLength, 12);
-            const shaftMesh = new THREE.Mesh(shaftGeometry, material);
-            
-            // 將柱體網格向上平移，使其基底位於 (0,0,0) 處
-            shaftMesh.position.y = shaftLength / 2;
-            
-            // 2. 箭頭 (Cone)
-            const headGeometry = new THREE.ConeGeometry(headRadius, headLength, 12);
-            const headMesh = new THREE.Mesh(headGeometry, material);
-            
-            // 將箭頭定位在軸身末端
-            headMesh.position.y = shaftLength + headLength / 2; 
+        return axisGroup;
+    }
 
-            axisGroup.add(shaftMesh);
-            axisGroup.add(headMesh);
-            
-            // 根據方向旋轉軸組，使 Cylinder 沿著正確的軸線延伸
-            if (direction === 'X') {
-                axisGroup.rotation.z = -Math.PI / 2; // 對齊 世界X 軸 (時間 t)
-            } else if (direction === 'Z') {
-                axisGroup.rotation.x = Math.PI / 2; // 對齊 世界Z 軸 (位置 x)
-            }
-            // Y 軸 (Cylinder 預設方向) 保持不變 (位移 y)
-            
-            return axisGroup;
-        }
+    // --- 3. Three.js 初始化 ---
+    function initThreeJS() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2d3748); // 深藍灰色背景
 
-        // --- 3. Three.js 初始化 ---
-        function initThreeJS() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x2d3748);
-
-            // 相機 (正交投影)
-            const aspect = $canvasContainer.clientWidth / $canvasContainer.clientHeight;
-            camera = new THREE.OrthographicCamera(-ORTHO_SIZE * aspect, ORTHO_SIZE * aspect, ORTHO_SIZE, -ORTHO_SIZE, 0.1, 100);
-            const originTarget = new THREE.Vector3(0, 0, 0);
-            // 調整相機位置以適應軸交換後的視角 (t=X, y=Y, x=Z)
-            camera.position.set(T_MAX * 1.8, A * 4, X_MAX * 1.8);
-            camera.lookAt(originTarget);
-
-            // 渲染器
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize($canvasContainer.clientWidth, $canvasContainer.clientHeight);
-            $canvasContainer.appendChild(renderer.domElement);
-
-            // 控制器
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = false; 
-            controls.rotateSpeed = 0.2; 
-            controls.target.copy(originTarget);
-            controls.update();
-
-            // 光源
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-            directionalLight.position.set(10, 10, 10);
-            scene.add(directionalLight);
-
-            // 座標軸、原點與 T 軸刻度
-            const AXIS_SHAFT_RADIUS = 0.04; 
-            const AXIS_HEAD_LENGTH = 0.4;   
-            const AXIS_HEAD_RADIUS = 0.15;  
-
-            // Origin Marker (黑色小球)
-            scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), new THREE.MeshBasicMaterial({ color: 0x000000 })));
-
-            // T (時間, 藍色) 軸沿 世界X 軸
-            scene.add(createThickAxis('X', T_MAX, 0x0000ff, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
-            // Y (位移, 綠色) 軸沿 世界Y 軸
-            scene.add(createThickAxis('Y', A * 2.5, 0x00ff00, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
-            // X (位置, 紅色) 軸沿 世界Z 軸
-            scene.add(createThickAxis('Z', X_MAX, 0xff0000, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
-
-            // T 軸刻度與標籤 (沿 世界X 軸延伸)
-            const tickStep = PERIOD;
-            const tickLength = 0.2;
-            for (let i = 0; i <= T_MAX / tickStep; i++) {
-                const t_val = i * tickStep;
-                if (t_val > T_MAX) continue;
-
-                // 3D Tick Line: 沿著 X 軸放置，Z 軸方向畫線
-                const start = new THREE.Vector3(t_val, 0, X_MIN); 
-                const end = new THREE.Vector3(t_val, 0, X_MIN + tickLength); 
-                const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-                scene.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xcccccc })));
-
-                // 2D Label (DOM)
-                const $label = document.createElement('div');
-                $label.className = 't-axis-label bg-gray-700 text-white text-base font-mono px-1 py-0.5 rounded-sm';
-                $label.textContent = t_val.toFixed(0);
-                $labelsContainer.appendChild($label);
-                
-                tAxisLabels.push({
-                    position: new THREE.Vector3(t_val, 0, X_MIN - 0.5), // 儲存 3D 投影位置 (世界X=t_val, 世界Z=X_MIN-0.5)
-                    element: $label
-                });
-            }
-
-            // 創建波浪曲面
-            createWaveSurface();
-            // 創建瞬時波形粒子 (綠色小球群)
-            createSnapshotParticles(); 
-            // 創建 y-t 軌跡線 (紅線)
-            createParticleTrackLine();
-            // 創建動態質點標記 (黃色小球)
-            createParticleMarker();
-
-            window.addEventListener('resize', onWindowResize, false);
-            updateAxisLabelsPosition();
-        }
+        // 相機 (正交投影)
+        const aspect = $canvasContainer.clientWidth / $canvasContainer.clientHeight;
+        camera = new THREE.OrthographicCamera(-ORTHO_SIZE * aspect, ORTHO_SIZE * aspect, ORTHO_SIZE, -ORTHO_SIZE, 0.1, 100);
+        const originTarget = new THREE.Vector3(0, 0, 0);
         
-        function createWaveSurface() {
-            // PlaneGeometry(Width, Height) -> Width=T_MAX (World X), Height=X_MAX (World Z)
-            const geometry = new THREE.PlaneGeometry(T_MAX, X_MAX, T_SEGMENTS, X_SEGMENTS_SURFACE);
-            geometry.rotateX(-Math.PI / 2); // 旋轉到 X-Z 平面
-            
-            const positions = geometry.attributes.position.array;
-            
-            for (let i = 0; i < positions.length; i += 3) {
-                // positions[i]   是世界 X 座標 -> T 值 (時間)
-                // positions[i+2] 是世界 Z 座標 -> X 值 (位置)
-                const t = positions[i] + T_MAX / 2;
-                const x = positions[i + 2] + X_MAX / 2;
-                positions[i + 1] = getWaveDisplacement(x, t); // y 軸 (位移)
-            }
+        // 調整相機位置以獲得良好的初始視角
+        camera.position.set(T_MAX * 1.8, A * 4, X_MAX * 1.8);
+        camera.lookAt(originTarget);
 
-            geometry.computeVertexNormals();
+        // 渲染器
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize($canvasContainer.clientWidth, $canvasContainer.clientHeight);
+        $canvasContainer.appendChild(renderer.domElement);
+
+        // 控制器
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 啟用阻尼
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.2; 
+        controls.target.copy(originTarget);
+        controls.update();
+
+        // 光源
+        // 1. 環境光 (Ambient Light): 高強度 1.0 確保所有軸線即使在背光處也清晰可見。
+        scene.add(new THREE.AmbientLight(0xffffff, 1.0)); 
+        
+        // 2. 平行光 (Directional Light): 提供立體感和曲面細節。強度從 1.5 降到 1.0 以平衡強環境光。
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6); 
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        // 座標軸、原點與 T 軸刻度
+        const AXIS_SHAFT_RADIUS = 0.04; 
+        const AXIS_HEAD_LENGTH = 0.4;   
+        const AXIS_HEAD_RADIUS = 0.15;  
+
+        // 座標原點標記 (黑色小球)
+        // 粒子使用 MeshBasicMaterial 以確保顏色始終一致，不受光照影響
+        scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 16), new THREE.MeshBasicMaterial({ color: 0x000000 })));
+
+        // T (時間, 藍色) 軸沿 世界X 軸
+        scene.add(createThickAxis('X', T_MAX, 0x0000ff, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
+        // Y (位移, 綠色) 軸沿 世界Y 軸
+        scene.add(createThickAxis('Y', A * 2.5, 0x00ff00, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
+        // X (位置, 紅色) 軸沿 世界Z 軸
+        scene.add(createThickAxis('Z', X_MAX, 0xff0000, AXIS_SHAFT_RADIUS, AXIS_HEAD_LENGTH, AXIS_HEAD_RADIUS)); 
+
+        // T 軸刻度與標籤 (沿 世界X 軸延伸)
+        const tickStep = 2.0; // 每 2.0 秒一個刻度 (一個週期)
+        const tickLength = 0.2;
+        for (let i = 0; i <= T_MAX / tickStep; i++) {
+            const t_val = i * tickStep;
+            if (t_val > T_MAX) continue;
+
+            // 3D Tick Line: 沿著 X 軸放置，Z 軸方向畫線
+            const start = new THREE.Vector3(t_val, 0, X_MIN); 
+            const end = new THREE.Vector3(t_val, 0, X_MIN + tickLength); 
+            const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+            scene.add(new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xcccccc })));
+
+            // 2D Label (DOM)
+            const $label = document.createElement('div');
+            $label.className = 't-axis-label bg-gray-700 text-white text-base font-mono px-1 py-0.5 rounded-sm';
+            $label.textContent = t_val.toFixed(0);
+            $labelsContainer.appendChild($label);
             
-            const material = new THREE.MeshStandardMaterial({
-                color: 0x4f46e5, // 靛藍色
-                wireframe: false,
-                side: THREE.DoubleSide,
-                opacity: 0.6,
-                transparent: true
+            tAxisLabels.push({
+                position: new THREE.Vector3(t_val, 0, X_MIN - 0.5), // 儲存 3D 投影位置
+                element: $label
             });
-
-            surfaceMesh = new THREE.Mesh(geometry, material);
-            // 修正：將曲面平移，使其角點 (x=0, t=0) 位於世界座標原點 (0, 0, 0)
-            surfaceMesh.position.set(T_MAX / 2, 0, X_MAX / 2);
-            
-            // 初始設定曲面為隱藏
-            surfaceMesh.visible = false; 
-
-            scene.add(surfaceMesh);
         }
+
+        // 創建波浪曲面
+        createWaveSurface();
+        // 創建瞬時波形粒子 (綠色小球群)
+        createSnapshotParticles(); 
+        // 創建 y-t 軌跡線 (紅線)
+        createParticleTrackLine();
+        // 創建動態質點標記 (黃色小球)
+        createParticleMarker();
+
+        window.addEventListener('resize', onWindowResize, false);
+        updateAxisLabelsPosition();
+    }
+    
+    function createWaveSurface() {
+        // PlaneGeometry(Width, Height) -> Width=T_MAX (World X), Height=X_MAX (World Z)
+        const geometry = new THREE.PlaneGeometry(T_MAX, X_MAX, T_SEGMENTS, X_SEGMENTS_SURFACE);
+        geometry.rotateX(-Math.PI / 2); // 旋轉到 X-Z 平面
         
-        function createSnapshotParticles() {
-            const particleGeometry = new THREE.SphereGeometry(0.08, 12, 12);
-            const particleMaterial = new THREE.MeshBasicMaterial({ color: 0x10b981 }); // 綠色
-
-            for (let i = 0; i < X_SEGMENTS_PARTICLES; i++) {
-                const x = i * X_STEP_PARTICLES;
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                
-                // 設定初始位置 (t=0)
-                particle.position.set(T_MIN, getWaveDisplacement(x, T_MIN), x); 
-                particle.userData = { x_val: x };
-
-                scene.add(particle);
-                snapshotParticles.push(particle);
-            }
-        }
-
-        function createParticleTrackLine() {
-            const particleTrackGeometry = new THREE.BufferGeometry();
-            // 需要 T_SEGMENTS + 1 個頂點
-            particleTrackGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((T_SEGMENTS + 1) * 3), 3)); 
-            // 調整 linewidth：維持細度 (3)
-            particleTrackLine = new THREE.Line(particleTrackGeometry, new THREE.LineBasicMaterial({ color: 0xef4444, linewidth: 3 })); // 紅線
-            scene.add(particleTrackLine);
-        }
-
-        function createParticleMarker() {
-            const markerGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-            const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 }); // 黃色
-            particleMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-            particleMarker.name = "ParticleMarker";
-            scene.add(particleMarker);
-        }
-
-
-        // --- 4. 更新 3D 物件 ---
-        function updateLines(t) {
-            // 1. 更新綠色小球 (瞬時波形)
-            snapshotParticles.forEach(particle => {
-                const x = particle.userData.x_val;
-                particle.position.y = getWaveDisplacement(x, t);
-                particle.position.x = t; // 世界 X 座標現在代表時間 t
-                // particle.position.z 保持為 x (位置)
-            });
-
-            // 2. 更新 y-t 軌跡線 (紅色) - 質點的歷史軌跡
-            const particlePositions = particleTrackLine.geometry.attributes.position.array;
-            for (let i = 0; i <= T_SEGMENTS; i++) {
-                const t_val = i * T_STEP;
-                const y = getWaveDisplacement(particleX, t_val);
-
-                // 世界 X (T 軸) = t_val (時間)
-                // 世界 Y (Y 軸) = y (位移)
-                // 世界 Z (X 軸) = particleX (固定位置)
-                particlePositions[i * 3 + 0] = t_val; 
-                particlePositions[i * 3 + 1] = y;
-                particlePositions[i * 3 + 2] = particleX; 
-            }
-            particleTrackLine.geometry.attributes.position.needsUpdate = true;
+        const positions = geometry.attributes.position.array;
+        
+        for (let i = 0; i < positions.length; i += 3) {
+            // positions[i]   是世界 X 座標，範圍 [-T_MAX/2, T_MAX/2] (對應時間 t)
+            // positions[i+2] 是世界 Z 座標，範圍 [-X_MAX/2, X_MAX/2] (對應位置 x)
             
-            // 3. 更新質點標記位置 (黃色小球) - 紅線上的當前時間點
-            const markerY = getWaveDisplacement(particleX, t);
-            // 世界 X (T 軸) = t (當前時間)
-            // 世界 Y (Y 軸) = markerY (位移)
+            // 轉換為物理值：範圍 [0, T_MAX] 和 [0, X_MAX]
+            const t = positions[i] + T_MAX / 2;
+            const x = positions[i + 2] + X_MAX / 2;
+            
+            // 將 y 位移賦值給世界 Y 座標 positions[i+1]
+            positions[i + 1] = getWaveDisplacement(x, t); 
+        }
+
+        geometry.computeVertexNormals();
+        
+        // MeshStandardMaterial 對光照有反應
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x4f46e5, // 靛藍色
+            wireframe: false,
+            side: THREE.DoubleSide,
+            opacity: 0.6,
+            transparent: true
+        });
+
+        surfaceMesh = new THREE.Mesh(geometry, material);
+        // 修正：將曲面平移，使 (x=0, t=0) 角點位於世界座標原點 (0, 0, 0)
+        surfaceMesh.position.set(T_MAX / 2, 0, X_MAX / 2);
+        
+        // 初始設定曲面為隱藏
+        surfaceMesh.visible = false; 
+
+        scene.add(surfaceMesh);
+    }
+    
+    function createSnapshotParticles() {
+        const particleGeometry = new THREE.SphereGeometry(0.08, 12, 12);
+        // 粒子使用 MeshBasicMaterial 以確保顏色始終一致，不受光照影響
+        const particleMaterial = new THREE.MeshBasicMaterial({ color: 0x10b981 }); // 綠色
+
+        for (let i = 0; i < X_SEGMENTS_PARTICLES; i++) {
+            const x = i * X_STEP_PARTICLES;
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // 初始位置 (t=0)
+            particle.position.set(T_MIN, getWaveDisplacement(x, T_MIN), x); 
+            particle.userData = { x_val: x }; // 儲存粒子的固定位置 x
+
+            scene.add(particle);
+            snapshotParticles.push(particle);
+        }
+    }
+
+    function createParticleTrackLine() {
+        const particleTrackGeometry = new THREE.BufferGeometry();
+        // 需要 T_SEGMENTS + 1 個頂點
+        particleTrackGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array((T_SEGMENTS + 1) * 3), 3)); 
+        // 軌跡線使用 MeshBasicMaterial 以確保顏色始終一致
+        particleTrackLine = new THREE.Line(particleTrackGeometry, new THREE.LineBasicMaterial({ color: 0xef4444 })); // 紅線
+        scene.add(particleTrackLine);
+    }
+
+    function createParticleMarker() {
+        const markerGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+        // 標記點使用 MeshBasicMaterial 以確保顏色始終一致
+        const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 }); // 黃色
+        particleMarker = new THREE.Mesh(markerGeometry, markerMaterial);
+        particleMarker.name = "ParticleMarker";
+        scene.add(particleMarker);
+    }
+
+
+    // --- 4. 更新 3D 物件 ---
+    function updateLines(t) {
+        // 1. 更新綠色小球 (瞬時波形)
+        snapshotParticles.forEach(particle => {
+            const x = particle.userData.x_val;
+            particle.position.y = getWaveDisplacement(x, t); // Y: 位移
+            particle.position.x = t; // X: 當前時間
+            // Z: 粒子固定位置 (x)
+        });
+
+        // 2. 更新 y-t 軌跡線 (紅色) - 質點的歷史軌跡
+        const particlePositions = particleTrackLine.geometry.attributes.position.array;
+        for (let i = 0; i <= T_SEGMENTS; i++) {
+            const t_val = i * T_STEP;
+            const y = getWaveDisplacement(particleX, t_val);
+
+            // 世界 X (T 軸) = t_val (時間)
+            // 世界 Y (Y 軸) = y (位移)
             // 世界 Z (X 軸) = particleX (固定位置)
-            particleMarker.position.set(t, markerY, particleX);
+            particlePositions[i * 3 + 0] = t_val; 
+            particlePositions[i * 3 + 1] = y;
+            particlePositions[i * 3 + 2] = particleX; 
+        }
+        particleTrackLine.geometry.attributes.position.needsUpdate = true;
+        
+        // 3. 更新質點標記位置 (黃色小球) - 紅線上的當前時間點
+        const markerY = getWaveDisplacement(particleX, t);
+        // 世界 X (T 軸) = t (當前時間)
+        // 世界 Y (Y 軸) = markerY (位移)
+        // 世界 Z (X 軸) = particleX (固定位置)
+        particleMarker.position.set(t, markerY, particleX);
+    }
+    
+    // 輔助函數：將 3D 座標轉換為 2D 螢幕座標來定位 DOM 元素
+    function updateAxisLabelsPosition() {
+        const containerRect = $canvasContainer.getBoundingClientRect();
+        
+        const toScreenPosition = (position, element) => {
+            const vector = position.clone().project(camera);
+            
+            // 將標準化座標 [-1, 1] 轉換為像素座標 [0, width/height]
+            const xScreen = (vector.x * 0.5 + 0.5) * containerRect.width;
+            const yScreen = (-vector.y * 0.5 + 0.5) * containerRect.height;
+            
+            element.style.left = `${xScreen}px`;
+            element.style.top = `${yScreen}px`;
+        };
+        
+        // X, Y, T 軸標籤
+        toScreenPosition(AXIS_LABEL_POSITIONS.x, $xLabel);
+        toScreenPosition(AXIS_LABEL_POSITIONS.y, $yLabel);
+        toScreenPosition(AXIS_LABEL_POSITIONS.t, $tLabel);
+
+        // T 軸刻度數字標籤
+        tAxisLabels.forEach(label => {
+            toScreenPosition(label.position, label.element);
+        });
+    }
+
+    // --- 5. 響應式佈局 ---
+    function onWindowResize() {
+        const width = $canvasContainer.clientWidth;
+        const height = $canvasContainer.clientHeight;
+        const aspect = width / height;
+        
+        // 調整正交投影相機的視椎體以保持比例
+        camera.left = -ORTHO_SIZE * aspect;
+        camera.right = ORTHO_SIZE * aspect;
+        camera.top = ORTHO_SIZE;
+        camera.bottom = -ORTHO_SIZE;
+        
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+        updateAxisLabelsPosition();
+    }
+
+    // --- 6. 主動畫循環 ---
+    let lastTime = performance.now();
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        const now = performance.now();
+        const delta = (now - lastTime) / 1000;
+        lastTime = now;
+
+        if (controls) {
+            controls.update(); 
+            // 由於 controls.update() 可能會移動攝影機，因此需要更新標籤位置
+            updateAxisLabelsPosition(); 
+        }
+
+        if (isPlaying) {
+            // 自動播放：根據時間差更新 currentTime
+            currentTime = (currentTime + delta) % T_MAX;
+            // 同步滑桿值，但不觸發 input 事件
+            $timeSlider.value = currentTime; 
+        } else {
+            // 暫停狀態：從滑桿讀取手動設定的值
+            currentTime = parseFloat($timeSlider.value);
         }
         
-        // 輔助函數：將 3D 座標轉換為 2D 螢幕座標
-        function updateAxisLabelsPosition() {
-            const toScreenPosition = (position, element) => {
-                const vector = position.clone().project(camera);
+        // 更新 UI 顯示
+        $timeValue.textContent = currentTime.toFixed(2);
+        
+        // 更新 3D 幾何體
+        updateLines(currentTime);
+        renderer.render(scene, camera);
+    }
+
+    // --- 7. 事件監聽器 ---
+    function setupEventListeners() {
+        $togglePlay.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            $playStateText.textContent = isPlaying ? '暫停' : '播放';
+            // 切換按鈕樣式
+            $togglePlay.classList.toggle('bg-green-600', isPlaying);
+            $togglePlay.classList.toggle('hover:bg-green-700', isPlaying);
+            $togglePlay.classList.toggle('bg-red-600', !isPlaying);
+            $togglePlay.classList.toggle('hover:bg-red-700', !isPlaying);
+        });
+        
+        $toggleSurface.addEventListener('click', () => {
+            if (surfaceMesh) {
+                surfaceMesh.visible = !surfaceMesh.visible;
+                const isVisible = surfaceMesh.visible;
+                $toggleSurface.textContent = isVisible ? '隱藏曲面' : '顯示曲面';
                 
-                const xScreen = (vector.x * 0.5 + 0.5) * $canvasContainer.clientWidth;
-                const yScreen = (-vector.y * 0.5 + 0.5) * $canvasContainer.clientHeight;
-                
-                element.style.left = `${xScreen}px`;
-                element.style.top = `${yScreen}px`;
-            };
-            
-            // X, Y, T 軸標籤
-            toScreenPosition(AXIS_LABEL_POSITIONS.x, $xLabel);
-            toScreenPosition(AXIS_LABEL_POSITIONS.y, $yLabel);
-            toScreenPosition(AXIS_LABEL_POSITIONS.t, $tLabel);
-
-            // T 軸刻度數字標籤
-            tAxisLabels.forEach(label => {
-                toScreenPosition(label.position, label.element);
-            });
-        }
-
-        // --- 5. 響應式佈局 ---
-        function onWindowResize() {
-            const aspect = $canvasContainer.clientWidth / $canvasContainer.clientHeight;
-            
-            camera.left = -ORTHO_SIZE * aspect;
-            camera.right = ORTHO_SIZE * aspect;
-            camera.top = ORTHO_SIZE;
-            camera.bottom = -ORTHO_SIZE;
-            
-            camera.updateProjectionMatrix();
-            renderer.setSize($canvasContainer.clientWidth, $canvasContainer.clientHeight);
-            updateAxisLabelsPosition();
-        }
-
-        // --- 6. 主動畫循環 (已優化) ---
-        let lastTime = performance.now();
-        function animate() {
-            requestAnimationFrame(animate);
-            
-            const now = performance.now();
-            const delta = (now - lastTime) / 1000;
-            lastTime = now;
-
-            if (controls) {
-                controls.update(); 
-                updateAxisLabelsPosition(); 
+                // 切換按鈕顏色：隱藏時為灰色，顯示時為靛藍色
+                $toggleSurface.classList.toggle('bg-gray-600', !isVisible);
+                $toggleSurface.classList.toggle('hover:bg-gray-700', !isVisible);
+                $toggleSurface.classList.toggle('bg-indigo-600', isVisible);
+                $toggleSurface.classList.toggle('hover:bg-indigo-700', isVisible);
             }
+        });
 
-            if (isPlaying) {
-                // 如果正在播放，則計算新的時間，並將其設定給滑桿
-                currentTime = (currentTime + delta) % T_MAX;
-                $timeSlider.value = currentTime; 
-                // 此時不需要再讀取滑桿值，因為 currentTime 已經是最新值
-            } else {
-                // 如果是暫停狀態，則確保 currentTime 是從滑桿手動讀取的值
-                currentTime = parseFloat($timeSlider.value);
-            }
-            
-            // 不論播放或暫停，都根據當前時間更新 UI 和 3D 物件
+        // 處理時間滑桿輸入：滑動時強制暫停動畫
+        $timeSlider.addEventListener('input', (e) => {
+            if (isPlaying) $togglePlay.click();
+            currentTime = parseFloat(e.target.value);
             $timeValue.textContent = currentTime.toFixed(2);
-            updateLines(currentTime);
-            renderer.render(scene, camera);
-        }
+            // 不需要手動呼叫 updateLines，因為 animate 循環會自動在下一幀更新
+        });
 
-        // --- 7. 事件監聽器 ---
-        function setupEventListeners() {
-            $togglePlay.addEventListener('click', () => {
-                isPlaying = !isPlaying;
-                $playStateText.textContent = isPlaying ? '暫停' : '播放';
-                $togglePlay.classList.toggle('bg-green-600', isPlaying);
-                $togglePlay.classList.toggle('hover:bg-green-700', isPlaying);
-                $togglePlay.classList.toggle('bg-red-600', !isPlaying);
-                $togglePlay.classList.toggle('hover:bg-red-700', !isPlaying);
-            });
-            
-            $toggleSurface.addEventListener('click', () => {
-                if (surfaceMesh) {
-                    surfaceMesh.visible = !surfaceMesh.visible;
-                    $toggleSurface.textContent = surfaceMesh.visible ? '隱藏曲面' : '顯示曲面';
-                    const isVisible = surfaceMesh.visible;
-                    // 根據可見性切換按鈕顏色
-                    $toggleSurface.classList.toggle('bg-gray-600', !isVisible);
-                    $toggleSurface.classList.toggle('hover:bg-gray-700', !isVisible);
-                    $toggleSurface.classList.toggle('bg-indigo-600', isVisible);
-                    $toggleSurface.classList.toggle('hover:bg-indigo-700', isVisible);
-                }
-            });
-
-            // 處理時間滑桿輸入：滑動時強制暫停動畫
-            $timeSlider.addEventListener('input', (e) => {
-                // 手動調整滑桿時，強制停止自動播放
-                if (isPlaying) $togglePlay.click();
-                // 這裡更新 currentTime (因為 animate() 在非播放時會讀取)
-                currentTime = parseFloat(e.target.value);
-                $timeValue.textContent = currentTime.toFixed(2);
-            });
-
-            $particleXInput.addEventListener('input', (e) => {
-                particleX = parseFloat(e.target.value);
-                $particleXValue.textContent = particleX.toFixed(2);
-                updateLines(currentTime);
-            });
-            
-            // 初始化滑桿
-            $timeSlider.max = T_MAX; 
-            $particleXInput.min = X_MIN;
-            $particleXInput.max = X_MAX;
+        // 處理質點位置滑桿輸入
+        $particleXInput.addEventListener('input', (e) => {
+            particleX = parseFloat(e.target.value);
             $particleXValue.textContent = particleX.toFixed(2);
-        }
-
-        // 啟動應用
-        window.onload = function () {
-            initThreeJS();
-            setupEventListeners();
-            
+            // 由於 particleX 改變，軌跡線需要立即重繪
             updateLines(currentTime);
-            renderer.render(scene, camera);
-            animate(); 
-        }
+        });
+        
+        // 初始化滑桿範圍和初始顯示值
+        $timeSlider.max = T_MAX; 
+        $particleXInput.min = X_MIN;
+        $particleXInput.max = X_MAX;
+        $particleXValue.textContent = particleX.toFixed(2);
+    }
+
+    // 啟動應用
+    window.onload = function () {
+        initThreeJS();
+        setupEventListeners();
+        
+        updateLines(currentTime); // 初始繪製
+        renderer.render(scene, camera);
+        animate(); // 啟動動畫循環
+    }
 })(); // IIFE 結尾
     </script>
 </body>
-
 </html>
