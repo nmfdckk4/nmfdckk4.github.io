@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多邊形向心力衝量模擬</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 1. 載入 MathJax 函式庫 -->
+    <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+    </script>
+    <!-- 2. MathJax 設定: 告訴 MathJax 掃描 $...$ 和 $$...$$ 語法 -->
+    <script>
+        MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']], // 內嵌公式標記
+                displayMath: [['$$', '$$'], ['\\[', '\\]']] // 顯示公式標記 (獨立一行)
+            }
+        };
+    </script>
+    
+    <style>
+        /* 設置 Inter 字體 */
+        html { font-family: 'Inter', sans-serif; }
+        /* 畫布樣式 */
+        #simulationCanvas {
+            background-color: #f7f7f7;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            margin: 0 auto; /* 確保畫布居中 */
+            display: block;
+            border-radius: 1rem; /* 圓角 */
+            /* 讓畫布寬度適應容器，最大 600px */
+            max-width: 600px;
+            width: 100%;
+            height: auto; /* 高度隨寬度調整 */
+            aspect-ratio: 1 / 1; /* 保持 1:1 比例 */
+        }
+        /* 滑桿樣式，確保在各瀏覽器中一致 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            background: #e0e7ff;
+            border-radius: 5px;
+            cursor: pointer;
+            outline: none;
+            transition: opacity .2s;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+    <div id="app-container" class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2">多邊形向心力衝量模擬</h1>
+            <p class="text-gray-600">觀察小球在正多邊形內彈性碰撞的運動軌跡，以及每次碰撞時的瞬時衝量 (向心衝量)。</p>
+        </header>
+
+        <!-- 畫布區塊 -->
+        <div class="flex justify-center mb-8">
+            <canvas id="simulationCanvas" width="600" height="600"></canvas>
+        </div>
+
+        <!-- 控制項區塊 -->
+        <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            
+            <div class="mb-6">
+                <label for="sides-slider" class="block text-lg font-medium text-gray-700 mb-2">
+                    多邊形邊數 (N): <span id="sides-value" class="font-bold text-blue-600">4</span>
+                </label>
+                <!-- N 的上限已改為 60 -->
+                <input type="range" id="sides-slider" min="3" max="60" value="4">
+                <p class="text-sm text-gray-500 mt-1">控制多邊形的邊數 (3 - 60)。N 越大，運動越接近圓周運動。</p>
+            </div>
+            
+            <!-- 模擬速度調整 -->
+            <div class="mb-6">
+                <label for="speed-slider" class="block text-lg font-medium text-gray-700 mb-2">
+                    模擬速度: <span id="speed-value" class="font-bold text-blue-600">1.0x</span>
+                </label>
+                <!-- 速度滑桿的初始值設為 1.0 -->
+                <input type="range" id="speed-slider" min="0.5" max="2.0" value="1.0" step="0.1">
+                <p class="text-sm text-gray-500 mt-1">調整小球的運動速度。</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+                <button id="restart-button" 
+                        class="flex-1 px-6 py-3 text-white font-semibold rounded-lg shadow-md transition duration-300 ease-in-out bg-indigo-500 hover:bg-indigo-600 active:ring-4 active:ring-indigo-300">
+                    暫停模擬
+                </button>
+                <button id="reset-button" 
+                        class="flex-1 px-6 py-3 bg-red-500 text-white font-semibold rounded-lg shadow-md transition duration-300 ease-in-out hover:bg-red-600 active:ring-4 active:ring-red-300">
+                    重設並從頭開始
+                </button>
+            </div>
+        </div>
+
+        <!-- 圖例說明 (使用 MathJax 渲染 LaTeX 公式) -->
+        <div class="mt-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <h3 class="text-xl font-semibold text-yellow-800 mb-3">圖例說明</h3>
+            <ul class="space-y-2 text-gray-700">
+                <li><span class="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span> <span class="font-medium">小球:</span> 運動質點。</li>
+                <li><span class="inline-block w-3 h-0.5 bg-green-700 mr-2"></span> <span class="font-medium">綠色箭頭 (實線, $\vec{v}_2$):</span> 小球碰撞<span class="font-bold">後</span>的<span class="font-bold">新速度向量</span>。</li>
+                <li><span class="inline-block w-3 h-0.5 bg-green-700 opacity-50 mr-2"></span> <span class="font-medium">綠色箭頭 (殘影, $\vec{v}_1$):</span> 紀錄碰撞<span class="font-bold">前</span>的<span class="font-bold">舊速度向量</span>，用於計算衝量。</li>
+                <li>
+                    <span class="inline-block w-3 h-0.5 bg-red-700 mr-2"></span> 
+                    <span class="font-medium">紅色箭頭 (閃爍, 衝量 $\vec{J}$):</span> 
+                    <span class="font-bold">瞬時衝量向量</span>。
+                    <p class="text-center text-lg my-2 p-1 bg-yellow-100 rounded border border-yellow-300">
+                        $$\vec{J} = \Delta \vec{p} = m(\vec{v}_2 - \vec{v}_1)$$
+                    </p>
+                    它代表了動量在碰撞瞬間的變化 ($\Delta \vec{p}$)，方向<span class="font-bold">永遠指向多邊形中心</span>，因此是<span class="font-bold">向心力的離散化表現</span>。
+                </li>
+                <li><span class="inline-block w-3 h-3 rounded-full bg-orange-400 mr-2"></span> <span class="font-medium">橘色圓點:</span> 小球的<span class="font-bold">當前目標撞擊點</span> (下一面牆壁的中點)。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+(function() { // 使用立即執行函式來隔離作用域，避免重複宣告錯誤
+    // Constants
+    const CANVAS = document.getElementById('simulationCanvas');
+    const CTX = CANVAS.getContext('2d');
+    // 移除固定的 RADIUS_POLYGON = 280，改為在 init() 中計算 currentPolygonRadius
+    const BALL_RADIUS = 10; // 保持固定，因為縮放後比例仍然適用
+    const DAMPING = 1.0; // 設置為 1.0 以保持速度大小不變
+    const SNAP_TOLERANCE_SQ = 1; // 用於捕捉到目標點的距離平方閾值
+    const INITIAL_SPEED_BASE = 2; // 基礎速度 (速度乘數為 1.0 時的速度)
+    
+    // 箭頭參數
+    const VELOCITY_ARROW_LENGTH_SCALE = 30; // 速度箭頭長度縮放比例
+    const ARROW_HEAD_SIZE = 18; // 箭頭頭部大小 
+    const VELOCITY_ARROW_LINE_WIDTH = 4; // 速度箭頭線寬 
+    const VELOCITY_ARROW_TRAIL_LIFETIME = 5; // 速度箭頭殘影保留的碰撞次數 
+    
+    // 瞬時作用力箭頭 (紅色)
+    const FORCE_ARROW_LENGTH_SCALE = 100; // 紅色衝量箭頭的長度縮放比例
+    const FORCE_ARROW_LINE_WIDTH = 5; // 衝量箭頭線寬 
+    const FORCE_ARROW_FLASH_DURATION = 20; // 衝量箭頭閃爍持續的幀數
+
+
+    // 變數
+    let CENTER_X = CANVAS.width / 2;
+    let CENTER_Y = CANVAS.height / 2;
+    // 【新增】動態多邊形半徑變數
+    let currentPolygonRadius = 280; // 初始化為預設值，在 init 中計算
+    
+    // State Variables
+    let N_SIDES = 4; // 初始邊數
+    let currentSpeedMultiplier = 1.0; // 初始速度乘數 (顯示值)
+    let isPaused = false;
+    let animationFrameId;
+    let currentWallIndex = 0; // 小球剛從這面牆壁飛離 (起點)
+    let targetMidpoint = { x: 0, y: 0 }; // 當前目標撞擊點 (終點)
+    
+    // 速度箭頭殘影追蹤 (記錄碰撞後的初始速度)
+    let velocityArrowTrail = []; // 儲存 { pos: {x,y}, vx: number, vy: number, remainingLifetime: N } 的陣列
+    
+    // 瞬時作用力箭頭 (紅色)
+    let instantaneousForceArrow = null; // 儲存 { pos: {x,y}, dir: {x,y}, mag: number, flashCounter: number }
+
+    let ball = {
+        x: CENTER_X, 
+        y: CENTER_Y,
+        vx: 0,
+        vy: 0,
+        mass: 1 // 質量設為 1，使 F=ma, J=mv
+    };
+
+    // UI Elements
+    const sidesSlider = document.getElementById('sides-slider');
+    const sidesValueSpan = document.getElementById('sides-value');
+    const resetButton = document.getElementById('reset-button');
+    const restartButton = document.getElementById('restart-button');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedValueSpan = document.getElementById('speed-value');
+
+    // --- Utility Functions ---
+
+    /**
+     * 計算兩個向量的點積。
+     */
+    function dotProduct(x1, y1, x2, y2) {
+        return x1 * x2 + y1 * y2;
+    }
+
+    /**
+     * 計算向量的長度 (magnitude)。
+     */
+    function magnitude(x, y) {
+        return Math.sqrt(x * x + y * y);
+    }
+
+    /**
+     * 單位化向量。
+     */
+    function normalize(x, y) {
+        const mag = magnitude(x, y);
+        if (mag === 0) return { x: 0, y: 0, mag: 0 };
+        return { x: x / mag, y: y / mag, mag: mag };
+    }
+
+    /**
+     * 獲取牆壁的中點坐標。
+     * @param {number} n 邊數
+     * @param {number} r 多邊形外接圓半徑
+     * @param {number} index 牆壁索引 (0 到 N-1)
+     */
+    function getWallMidpoint(n, r, index) {
+        // 多邊形半角
+        const halfAngle = Math.PI / n;
+        // 圓心到中點的距離 (邊心距)
+        const apothem = r * Math.cos(halfAngle); 
+        
+        // 牆壁 i 的中點角度是 i * 2*pi/N (牆壁 0 的中點在正X軸上)
+        const angle = (2 * Math.PI * index / n); 
+        
+        return {
+            x: CENTER_X + apothem * Math.cos(angle),
+            y: CENTER_Y + apothem * Math.sin(angle)
+        };
+    }
+
+    /**
+     * 重設小球的初始狀態，使其從 Wall 0 中點射向 Wall 1 中點。
+     */
+    function resetBall() {
+        const N = N_SIDES;
+        const R = currentPolygonRadius; // 【變更】使用動態半徑
+        
+        // 1. 設置起始牆壁和目標牆壁
+        currentWallIndex = 0; // 剛從 Wall 0 飛離 (起點)
+        const nextWallIndex = (currentWallIndex + 1) % N; // 目標是 Wall 1
+        
+        // 2. 獲取起始牆壁的中點 (Wall 0) - 這將是小球的初始位置
+        const startMidpoint = getWallMidpoint(N, R, currentWallIndex);
+        
+        // 3. 獲取目標牆壁的中點 (Wall 1) - 這將是第一個目標
+        targetMidpoint = getWallMidpoint(N, R, nextWallIndex);
+        
+        // 4. 初始位置
+        ball.x = startMidpoint.x;
+        ball.y = startMidpoint.y;
+        
+        // 5. 計算速度向量 V (V = Target - Start)
+        const dirX = targetMidpoint.x - ball.x;
+        const dirY = targetMidpoint.y - ball.y;
+        
+        const { x: normX, y: normY, mag } = normalize(dirX, dirY);
+        
+        // 6. 設定速度：使用 INITIAL_SPEED_BASE 乘以 UI 顯示的乘數
+        const currentActualSpeed = INITIAL_SPEED_BASE * currentSpeedMultiplier;
+        ball.vx = normX * currentActualSpeed;
+        ball.vy = normY * currentActualSpeed;
+        
+        // 7. 清空殘影和瞬時作用力箭頭
+        velocityArrowTrail = [];
+        instantaneousForceArrow = null;
+    }
+
+
+    // --- Geometry Functions ---
+
+    /**
+     * 產生多邊形的頂點。
+     * @param {number} n 邊數
+     * @param {number} r 多邊形外接圓半徑
+     */
+    function getPolygonVertices(n, r) {
+        const vertices = [];
+        // 初始旋轉角度，讓一條邊的中點在正X軸上 (Wall 0 的中點)
+        const rotationOffset = Math.PI / n; 
+
+        for (let i = 0; i < n; i++) {
+            // 頂點的角度
+            const angle = (2 * Math.PI * i / n) + rotationOffset;
+            vertices.push({
+                x: CENTER_X + r * Math.cos(angle),
+                y: CENTER_Y + r * Math.sin(angle)
+            });
+        }
+        return vertices;
+    }
+
+    // --- Drawing Functions ---
+
+    /**
+     * 繪製一個箭頭。
+     */
+    function drawArrow(fromX, fromY, toX, toY, color, lineWidth, headSize, alpha = 1) {
+        CTX.save(); // 保存當前狀態
+        CTX.globalAlpha = alpha; // 設定透明度
+        CTX.beginPath();
+        CTX.strokeStyle = color;
+        CTX.fillStyle = color; // 箭頭頭部也用顏色填充
+        CTX.lineWidth = lineWidth;
+        
+        // 繪製線段
+        CTX.moveTo(fromX, fromY);
+        CTX.lineTo(toX, toY);
+        CTX.stroke();
+
+        // 繪製箭頭頭部
+        const angle = Math.atan2(toY - fromY, toX - fromX);
+        CTX.beginPath();
+        CTX.moveTo(toX, toY);
+        // 箭頭的兩個邊
+        CTX.lineTo(toX - headSize * Math.cos(angle - Math.PI / 6), toY - headSize * Math.sin(angle - Math.PI / 6));
+        CTX.lineTo(toX - headSize * Math.cos(angle + Math.PI / 6), toY - headSize * Math.sin(angle + Math.PI / 6));
+        CTX.closePath();
+        CTX.fill();
+
+        CTX.restore(); // 恢復之前保存的狀態 (特別是 globalAlpha)
+    }
+
+    /**
+     * 繪製多邊形牆壁。
+     */
+    function drawPolygon(vertices) {
+        if (vertices.length < 3) return;
+
+        // 繪製邊界
+        CTX.beginPath();
+        CTX.moveTo(vertices[0].x, vertices[0].y);
+        for (let i = 1; i < vertices.length; i++) {
+            CTX.lineTo(vertices[i].x, vertices[i].y);
+        }
+        CTX.closePath();
+        CTX.strokeStyle = '#1e40af'; // 深藍色
+        CTX.lineWidth = 4;
+        CTX.stroke();
+
+        // 繪製當前目標中點 (讓它在撞擊時閃爍)
+        if (targetMidpoint) {
+            CTX.beginPath();
+            CTX.arc(targetMidpoint.x, targetMidpoint.y, 5, 0, Math.PI * 2);
+            CTX.fillStyle = 'rgba(255, 165, 0, 0.8)'; // 橘色高亮
+            CTX.fill();
+        }
+    }
+
+    /**
+     * 繪製小球、速度箭頭及其殘影。
+     */
+    function drawBallAndArrows() {
+        // 固定箭頭長度，確保不受 currentSpeedMultiplier 影響
+        // 箭頭長度現在基於 INITIAL_SPEED_BASE 來計算
+        const fixedVelocityArrowLength = INITIAL_SPEED_BASE * VELOCITY_ARROW_LENGTH_SCALE;
+
+        // A. 繪製所有速度箭頭殘影 (舊的速度 V1 - 帶有透明度的綠色)
+        // 繪製殘影在小球之下，避免遮擋
+        for (let i = 0; i < velocityArrowTrail.length; i++) {
+            const arrow = velocityArrowTrail[i];
+            const alpha = arrow.remainingLifetime / VELOCITY_ARROW_TRAIL_LIFETIME; // 根據生命週期調整透明度
+            
+            // 獲取方向向量，以固定長度繪製
+            const { x: normVX, y: normVY } = normalize(arrow.vx, arrow.vy);
+
+            const arrowEndX = arrow.pos.x + normVX * fixedVelocityArrowLength;
+            const arrowEndY = arrow.pos.y + normVY * fixedVelocityArrowLength;
+            
+            // 使用帶有基礎透明度的綠色來繪製殘影
+            drawArrow(arrow.pos.x, arrow.pos.y, arrowEndX, arrowEndY, 'rgba(4, 120, 87, 0.7)', VELOCITY_ARROW_LINE_WIDTH, ARROW_HEAD_SIZE, alpha * 0.7); 
+        }
+
+        // B. 繪製小球
+        CTX.beginPath();
+        CTX.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+        CTX.fillStyle = '#ef4444'; // 紅色
+        CTX.fill();
+        CTX.strokeStyle = '#b91c1c';
+        CTX.lineWidth = 1;
+        CTX.stroke();
+
+        // C. 繪製瞬時作用力箭頭 (紅色 - 向心力衝量 J=ΔP=mΔv)
+        if (instantaneousForceArrow && instantaneousForceArrow.flashCounter > 0) {
+            const arrow = instantaneousForceArrow;
+            // 隨著閃爍計數器遞減而變透明
+            const alpha = arrow.flashCounter / FORCE_ARROW_FLASH_DURATION; 
+            
+            // 根據已縮放的衝量大小 (arrow.mag) 來決定箭頭長度
+            const arrowLength = arrow.mag * FORCE_ARROW_LENGTH_SCALE; 
+            
+            const arrowEndX = arrow.pos.x + arrow.dir.x * arrowLength;
+            const arrowEndY = arrow.pos.y + arrow.dir.y * arrowLength;
+            
+            // 使用紅色來代表作用力/衝量
+            drawArrow(arrow.pos.x, arrow.pos.y, arrowEndX, arrowEndY, '#dc2626', FORCE_ARROW_LINE_WIDTH, ARROW_HEAD_SIZE, alpha); 
+        }
+
+        // D. 繪製速度箭頭 (當前速度 V2 - 亮綠色)
+        const speedMag = magnitude(ball.vx, ball.vy);
+        if (speedMag > 0.01) { // 避免速度過小時繪製
+            // 獲取速度的方向向量
+            const { x: normVX, y: normVY } = normalize(ball.vx, ball.vy);
+
+            const arrowEndX = ball.x + normVX * fixedVelocityArrowLength;
+            const arrowEndY = ball.y + normVY * fixedVelocityArrowLength;
+            drawArrow(ball.x, ball.y, arrowEndX, arrowEndY, '#047857', VELOCITY_ARROW_LINE_WIDTH, ARROW_HEAD_SIZE); // 綠色箭頭
+        }
+    }
+
+
+    // --- Physics Simulation (Deterministic Path Tracing) ---
+
+    /**
+     * 更新小球的位置和速度 (確定性路徑追蹤)。
+     */
+    function updatePhysics() {
+        if (!targetMidpoint || N_SIDES < 3) return; // 保護
+
+        // 1. 記錄碰撞前的位置和速度 (在移動之前)
+        const oldX = ball.x;
+        const oldY = ball.y;
+        const oldVx = ball.vx;
+        const oldVy = ball.vy;
+
+        // 2. 應用速度 (移動一步)
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // 3. 計算從舊位置到目標點的向量 (用於檢查過衝)
+        const dx_new = targetMidpoint.x - ball.x;
+        const dy_new = targetMidpoint.y - ball.y;
+        const distSq_new = dx_new * dx_new + dy_new * dy_new;
+
+        // 4. 檢查是否到達目標點 (距離極小) 或過衝
+        const vel_dot_target_dir = dotProduct(ball.vx, ball.vy, dx_new, dy_new);
+
+        if (distSq_new < SNAP_TOLERANCE_SQ || vel_dot_target_dir < 0) { 
+            // 碰撞/到達目標點！
+
+            // A. 瞬時捕捉到目標點 (確保精確碰撞)
+            ball.x = targetMidpoint.x;
+            ball.y = targetMidpoint.y;
+
+            // B. 更新狀態和下一目標
+            currentWallIndex = (currentWallIndex + 1) % N_SIDES;
+            const nextTargetWallIndex = (currentWallIndex + 1) % N_SIDES;
+            
+            // C. 設置新的目標點
+            const R = currentPolygonRadius; // 【變更】使用動態半徑
+            const newTargetMidpoint = getWallMidpoint(N_SIDES, R, nextTargetWallIndex);
+            
+            // D. 計算新的速度向量 (從當前位置指向新目標)
+            const dirX = newTargetMidpoint.x - ball.x;
+            const dirY = newTargetMidpoint.y - ball.y;
+            
+            const { x: normX, y: normY } = normalize(dirX, dirY);
+            
+            // 新的速度計算：使用 INITIAL_SPEED_BASE 乘以 UI 顯示的乘數
+            const speed_after_collision = INITIAL_SPEED_BASE * DAMPING * currentSpeedMultiplier; 
+
+            ball.vx = normX * speed_after_collision;
+            ball.vy = normY * speed_after_collision;
+
+            // E. 計算作用力箭頭 (速度變化量) J = m * Δv = m * (V2 - V1)
+            const forceX = ball.vx - oldVx; // V2x - V1x
+            const forceY = ball.vy - oldVy; // V2y - V1y
+            const normalizedForce = normalize(forceX, forceY);
+
+            // 【關鍵點】將衝量大小縮放回基礎速度的表示，只需除以 currentSpeedMultiplier
+            const impulseMagBase = normalizedForce.mag / currentSpeedMultiplier;
+
+            // G. 儲存瞬時作用力箭頭 (紅色) - 代表向心衝量
+            instantaneousForceArrow = { 
+                pos: { x: ball.x, y: ball.y },
+                dir: { x: normalizedForce.x, y: normalizedForce.y },
+                mag: impulseMagBase, // 存儲與模擬速度無關的基礎衝量大小
+                flashCounter: FORCE_ARROW_FLASH_DURATION
+            };
+
+            // H. 將舊速度 V1 的箭頭添加到殘影追蹤陣列，位置為碰撞點
+            velocityArrowTrail.unshift({ // 添加到開頭
+                pos: { x: ball.x, y: ball.y }, // 記錄碰撞發生的位置
+                vx: oldVx, // 記錄舊速度 (V1)
+                vy: oldVy, // 記錄舊速度 (V1)
+                remainingLifetime: VELOCITY_ARROW_TRAIL_LIFETIME 
+            });
+
+            // I. 減少所有現有殘影箭頭的生命週期並過濾已消失的箭頭
+            velocityArrowTrail = velocityArrowTrail.filter(arrow => {
+                arrow.remainingLifetime--;
+                return arrow.remainingLifetime > 0;
+            });
+
+            // J. 更新目標點
+            targetMidpoint = newTargetMidpoint;
+
+        } else {
+            // 繼續移動
+        }
+    }
+
+
+    // --- Animation Loop ---
+
+    /**
+     * 主動畫循環。
+     */
+    function animate() {
+        if (isPaused) return;
+
+        // 1. 清空畫布
+        CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+
+        // 2. 更新物理狀態 (每幀更新一次)
+        updatePhysics();
+        
+        // 減少瞬時作用力箭頭的閃爍計數器 (讓它逐漸消失)
+        if (instantaneousForceArrow && instantaneousForceArrow.flashCounter > 0) {
+            instantaneousForceArrow.flashCounter--;
+        }
+
+        // 3. 繪製多邊形和圓心
+        const R = currentPolygonRadius; // 【變更】使用動態半徑
+        const vertices = getPolygonVertices(N_SIDES, R);
+        drawPolygon(vertices);
+        
+        CTX.beginPath();
+        CTX.arc(CENTER_X, CENTER_Y, 3, 0, Math.PI * 2);
+        CTX.fillStyle = '#059669'; // 圓心綠色
+        CTX.fill();
+
+        // 4. 繪製小球和箭頭
+        drawBallAndArrows();
+
+        // 請求下一幀
+        animationFrameId = requestAnimationFrame(animate);
+    }
+
+    /**
+     * 啟動或暫停動畫。
+     */
+    function toggleAnimation() {
+        if (isPaused) {
+            isPaused = false;
+            restartButton.textContent = '暫停模擬'; // 修改文本為“暫停模擬”
+            restartButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+            restartButton.classList.add('bg-indigo-500', 'hover:bg-indigo-600');
+            animate();
+        } else {
+            isPaused = true;
+            restartButton.textContent = '繼續模擬';
+            restartButton.classList.remove('bg-indigo-500', 'hover:bg-indigo-600');
+            restartButton.classList.add('bg-green-500', 'hover:bg-green-600');
+            cancelAnimationFrame(animationFrameId);
+        }
+    }
+
+    // --- Initialization and Event Handlers ---
+
+    function init() {
+        // 設置初始的 N 值
+        sidesValueSpan.textContent = N_SIDES;
+        sidesSlider.value = N_SIDES;
+
+        // 設置初始速度顯示值為 1.0x
+        speedValueSpan.textContent = currentSpeedMultiplier.toFixed(1) + 'x';
+        speedSlider.value = currentSpeedMultiplier;
+
+        // 設置畫布尺寸以適應容器 (獲取當前寬度)
+        const containerWidth = document.getElementById('app-container').clientWidth - 32; // 減去 padding
+        // 限制最大尺寸為 600px，但以 containerWidth 為優先 (在手機上會小於 600)
+        const size = Math.min(containerWidth, 600); 
+        CANVAS.width = size;
+        CANVAS.height = size;
+
+        // 調整中心點
+        CENTER_X = CANVAS.width / 2;
+        CENTER_Y = CANVAS.height / 2;
+
+        // 【關鍵變更】動態計算多邊形半徑：使用畫布寬度的一半 (size / 2) 乘以 0.9 (90%) 作為邊距
+        currentPolygonRadius = (size / 2) * 0.9;
+        
+        // 重設小球狀態並啟動
+        resetBall();
+        
+        // 預設啟動動畫
+        if (!isPaused) {
+            isPaused = true; // 設置為 true 才能讓 toggleAnimation 啟動它
+            toggleAnimation();
+        }
+    }
+    
+    // 牆壁數量調整事件
+    sidesSlider.addEventListener('input', (e) => {
+        N_SIDES = parseInt(e.target.value, 10);
+        sidesValueSpan.textContent = N_SIDES;
+        // 每次改變 N_SIDES 後，重設小球
+        resetBall();
+        if (isPaused) {
+            // 如果暫停，手動繪製一幀新的多邊形
+            CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+            const R = currentPolygonRadius;
+            const vertices = getPolygonVertices(N_SIDES, R);
+            drawPolygon(vertices);
+            drawBallAndArrows();
+        }
+    });
+
+    // 模擬速度調整事件 
+    speedSlider.addEventListener('input', (e) => {
+        const newDisplayedMultiplier = parseFloat(e.target.value);
+        
+        // 獲取當前速度的方向向量
+        const speedMag = magnitude(ball.vx, ball.vy);
+        if (speedMag > 0.01) {
+            const { x: normX, y: normY } = normalize(ball.vx, ball.vy);
+            
+            // 使用新的顯示乘數和新的 INITIAL_SPEED_BASE 重新計算實際速度
+            const newActualSpeed = INITIAL_SPEED_BASE * newDisplayedMultiplier;
+            ball.vx = normX * newActualSpeed;
+            ball.vy = normY * newActualSpeed;
+        }
+
+        currentSpeedMultiplier = newDisplayedMultiplier;
+        speedValueSpan.textContent = currentSpeedMultiplier.toFixed(1) + 'x';
+
+        // 如果暫停，手動繪製一幀
+        if (isPaused) {
+            CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+            const R = currentPolygonRadius;
+            const vertices = getPolygonVertices(N_SIDES, R);
+            drawPolygon(vertices);
+            drawBallAndArrows();
+        }
+    });
+
+    // 重設按鈕事件
+    resetButton.addEventListener('click', () => {
+        resetBall();
+        if (isPaused) {
+            // 如果暫停，重設後也需要手動繪製一幀
+            CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+            const R = currentPolygonRadius;
+            const vertices = getPolygonVertices(N_SIDES, R);
+            drawPolygon(vertices);
+            drawBallAndArrows();
+        }
+    });
+
+    // 啟動/暫停按鈕事件
+    restartButton.addEventListener('click', toggleAnimation);
+    
+    // 增加一個視窗大小調整事件處理器，確保畫布大小和中心點始終正確
+    window.addEventListener('resize', init);
+
+    // 頁面載入後啟動模擬
+    window.onload = init;
+})(); // IIFE 結束
+
+</script>
+<!-- 引入 Firebase 相關腳本 (本範例未使用 Firestore) -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Global variables provided by the environment
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let app, db, auth;
+
+    if (firebaseConfig) {
+        setLogLevel('Debug');
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+
+        // Authentication setup
+        const authenticate = async () => {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Firebase: Signed in with custom token.");
+                } else {
+                    await signInAnonymously(auth);
+                    console.log("Firebase: Signed in anonymously.");
+                }
+            } catch (error) {
+                console.error("Firebase Auth Error:", error);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                console.log("User ID:", user.uid);
+            } else {
+                // User is signed out, re-authenticate if token exists
+                if (!initialAuthToken) {
+                    // Only sign in anonymously if no token is available
+                    authenticate();
+                }
+            }
+        });
+
+        // If a token exists, start the initial sign-in process outside the listener
+        if (initialAuthToken) {
+            authenticate();
+        }
+    } else {
+        console.warn("Firebase config not available. Proceeding without Firebase.");
+    }
+</script>
+</body>
+</html>
