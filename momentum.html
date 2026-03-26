@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>完全非彈性碰撞：尋找「質心參考系」</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* ------------------------------------------- */
+    /* 1. 全域字體大小控制：修改這裡可以調整整體基礎字級 */
+    /* ------------------------------------------- */
+    body {
+      font-size: 1.25rem; /* 目前設定為 20px，預設通常是 16px */
+    }
+
+    /* 滑桿外觀自訂 */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 28px;
+      width: 28px;
+      border-radius: 50%;
+      background: currentColor;
+      cursor: pointer;
+      margin-top: -10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 12px;
+      cursor: pointer;
+      background: rgba(0,0,0,0.1);
+      border-radius: 6px;
+    }
+
+    /* ------------------------------------------- */
+    /* 2. 球體上方標籤字體：修改這裡調整球上的文字大小 */
+    /* ------------------------------------------- */
+    .v-label {
+      position: absolute;
+      bottom: 115%;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 1.1rem; /* 這裡控制球上速度文字的大小 */
+      font-weight: bold;
+      font-family: monospace;
+      pointer-events: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- 標題：使用了 text-3xl 至 text-4xl -->
+    <div class="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 text-center md:text-left">
+      <h1 class="text-4xl font-black text-slate-900 mb-3">完全非彈性碰撞：尋找「質心參考系」</h1>
+      <p class="text-slate-600 text-xl">
+        調整「<span class="font-bold text-amber-600">參考系速度</span>」找到讓碰撞後合體球<strong class="text-indigo-600">完全靜止</strong>的視角。
+      </p>
+    </div>
+
+    <!-- 動畫顯示區 -->
+    <div class="bg-slate-900 rounded-2xl shadow-inner relative overflow-hidden flex flex-col items-center justify-center border-4 border-slate-800" style="height: 380px;">
+      <div id="grid-container" class="absolute inset-0 opacity-20 pointer-events-none"></div>
+      <div class="absolute left-0 right-0 h-1 bg-slate-700 top-1/2 -mt-0.5"></div>
+
+      <!-- 球 1 -->
+      <div id="ball1" class="absolute rounded-full bg-red-500 shadow-lg flex items-center justify-center text-white font-bold text-xl transition-none">
+        <div class="v-label" id="ball1-v-label">v' = 0.00</div>
+        <span id="ball1-text">2kg</span>
+      </div>
+
+      <!-- 球 2 -->
+      <div id="ball2" class="absolute rounded-full bg-blue-500 shadow-lg flex items-center justify-center text-white font-bold text-xl transition-none">
+        <div class="v-label" id="ball2-v-label">v' = 0.00</div>
+        <span id="ball2-text">3kg</span>
+      </div>
+
+      <div id="collision-ring" class="absolute border-4 border-dashed border-yellow-400 rounded-full animate-pulse pointer-events-none hidden"></div>
+
+      <!-- 狀態疊加層：text-xl -->
+      <div class="absolute top-6 left-6 text-white bg-black/60 px-4 py-2 rounded-xl text-xl font-mono border border-white/20">
+        時間: <span id="time-display">0.00</span> s
+        <span id="collided-alert" class="ml-4 text-yellow-400 font-bold hidden">● 已碰撞</span>
+      </div>
+    </div>
+
+    <!-- 緊湊數據面板 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 參考系控制：text-2xl 與 text-3xl -->
+      <div class="lg:col-span-2 bg-amber-50 rounded-2xl shadow-sm border border-amber-200 p-8 flex flex-col justify-center">
+        <div class="flex justify-between items-end mb-6">
+          <h3 class="text-2xl font-bold text-amber-900 flex items-center">
+            <svg class="mr-3" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+            觀察者參考系 (v_ref)
+          </h3>
+          <span id="vRef-val" class="font-mono text-4xl font-black bg-amber-200 px-4 py-1 rounded-lg">0.00</span>
+        </div>
+        <input type="range" id="vRef-slider" min="-15" max="15" step="0.1" value="0" class="w-full text-amber-600 mb-6">
+        <div class="flex gap-4">
+          <button id="btn-reset-vref" class="flex-1 py-3 bg-white text-slate-700 text-lg font-bold rounded-xl border-2 border-slate-200 hover:bg-slate-100 transition-colors">實驗室系 (v=0)</button>
+          <button id="btn-com-frame" class="flex-1 py-3 bg-amber-600 text-white text-xl font-black rounded-xl shadow-lg hover:bg-amber-700 transition-all active:scale-95">切換至質心系</button>
+        </div>
+      </div>
+
+      <!-- 總動量：text-6xl 強調數值 -->
+      <div class="bg-indigo-700 rounded-2xl shadow-xl p-8 flex flex-col items-center justify-center text-white border-b-8 border-indigo-900">
+        <h3 class="text-xl font-bold opacity-90 mb-2">系統總動量 (P)</h3>
+        <div class="text-6xl font-black font-mono tracking-tighter" id="dash-totalp">2.00</div>
+        <p class="text-sm mt-4 opacity-80 font-medium">kg·m/s (始終守恆)</p>
+      </div>
+    </div>
+
+    <!-- 參數與播放控制 -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <!-- 播放控制 -->
+        <div class="lg:col-span-3 flex flex-col items-center justify-center space-y-4 border-b lg:border-b-0 lg:border-r border-slate-100 pb-10 lg:pb-0">
+          <div class="flex space-x-6">
+            <button id="btn-play" class="w-20 h-20 rounded-full text-white transition-all shadow-xl bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center hover:scale-105 active:scale-95">
+              <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="ml-1"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="hidden"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            </button>
+            <button id="btn-reset" class="w-20 h-20 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all flex items-center justify-center shadow-md">
+              <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+            </button>
+          </div>
+          <div id="play-status" class="text-xl font-black text-slate-400 uppercase tracking-widest">Paused</div>
+        </div>
+
+        <!-- 參數調節 -->
+        <div class="lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+          <div class="bg-red-50/50 p-4 rounded-xl border border-red-100">
+            <div class="text-red-600 font-black mb-4 border-b-2 border-red-200 pb-1 text-xl tracking-tight">🔴 左球 m₁ / v₁</div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between font-bold mb-2"><span>質量</span><span id="m1-val" class="font-mono text-xl">2 kg</span></div>
+                <input type="range" id="m1-slider" min="1" max="10" step="1" value="2" class="w-full accent-red-500">
+              </div>
+              <div>
+                <div class="flex justify-between font-bold mb-2"><span>初速 (Lab)</span><span id="v1-val" class="font-mono text-xl">4 m/s</span></div>
+                <input type="range" id="v1-slider" min="-10" max="10" step="1" value="4" class="w-full accent-red-500">
+              </div>
+            </div>
+          </div>
+          <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+            <div class="text-blue-600 font-black mb-4 border-b-2 border-blue-200 pb-1 text-xl tracking-tight">🔵 右球 m₂ / v₂</div>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between font-bold mb-2"><span>質量</span><span id="m2-val" class="font-mono text-xl">3 kg</span></div>
+                <input type="range" id="m2-slider" min="1" max="10" step="1" value="3" class="w-full accent-blue-500">
+              </div>
+              <div>
+                <div class="flex justify-between font-bold mb-2"><span>初速 (Lab)</span><span id="v2-val" class="font-mono text-xl">-2 m/s</span></div>
+                <input type="range" id="v2-slider" min="-10" max="10" step="1" value="-2" class="w-full accent-blue-500">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      m1: 2, v1: 4,
+      m2: 3, v2: -2,
+      vRef: 0,
+      time: 0,
+      isPlaying: false
+    };
+
+    const els = {
+      ball1: document.getElementById('ball1'),
+      ball1V: document.getElementById('ball1-v-label'),
+      ball2: document.getElementById('ball2'),
+      ball2V: document.getElementById('ball2-v-label'),
+      ball1Text: document.getElementById('ball1-text'),
+      ball2Text: document.getElementById('ball2-text'),
+      collisionRing: document.getElementById('collision-ring'),
+      timeDisplay: document.getElementById('time-display'),
+      collidedAlert: document.getElementById('collided-alert'),
+      gridContainer: document.getElementById('grid-container'),
+      
+      vRefSlider: document.getElementById('vRef-slider'),
+      vRefVal: document.getElementById('vRef-val'),
+      m1Slider: document.getElementById('m1-slider'),
+      m1Val: document.getElementById('m1-val'),
+      v1Slider: document.getElementById('v1-slider'),
+      v1Val: document.getElementById('v1-val'),
+      m2Slider: document.getElementById('m2-slider'),
+      m2Val: document.getElementById('m2-val'),
+      v2Slider: document.getElementById('v2-slider'),
+      v2Val: document.getElementById('v2-val'),
+
+      dashTotalP: document.getElementById('dash-totalp'),
+
+      btnPlay: document.getElementById('btn-play'),
+      iconPlay: document.getElementById('icon-play'),
+      iconPause: document.getElementById('icon-pause'),
+      playStatus: document.getElementById('play-status'),
+      btnReset: document.getElementById('btn-reset'),
+      btnResetVref: document.getElementById('btn-reset-vref'),
+      btnComFrame: document.getElementById('btn-com-frame')
+    };
+
+    const scale = 40;
+    function initGrid() {
+      for (let i = -100; i <= 100; i++) {
+        const line = document.createElement('div');
+        line.className = 'absolute top-0 bottom-0 w-px bg-white';
+        line.style.left = `calc(50% + ${i * scale}px)`;
+        els.gridContainer.appendChild(line);
+      }
+    }
+    initGrid();
+
+    function render() {
+      const initialX1 = -6; 
+      const initialX2 = 6;  
+      const r1 = 0.45 + 0.1 * state.m1; // 稍微加大球體
+      const r2 = 0.45 + 0.1 * state.m2;
+
+      const relV = state.v1 - state.v2;
+      const tc = relV > 0 ? (initialX2 - initialX1 - r1 - r2) / relV : Infinity;
+      const vf = (state.m1 * state.v1 + state.m2 * state.v2) / (state.m1 + state.m2);
+
+      const isCollided = state.time >= tc && tc > 0;
+
+      let labX1, labX2;
+      if (!isCollided) {
+        labX1 = initialX1 + state.v1 * state.time;
+        labX2 = initialX2 + state.v2 * state.time;
+      } else {
+        const collX1 = initialX1 + state.v1 * tc;
+        const collX2 = collX1 + r1 + r2; 
+        labX1 = collX1 + vf * (state.time - tc);
+        labX2 = collX2 + vf * (state.time - tc);
+      }
+
+      const viewX1 = labX1 - state.vRef * state.time;
+      const viewX2 = labX2 - state.vRef * state.time;
+
+      const currentV1View = !isCollided ? (state.v1 - state.vRef) : (vf - state.vRef);
+      const currentV2View = !isCollided ? (state.v2 - state.vRef) : (vf - state.vRef);
+
+      const p1 = state.m1 * currentV1View;
+      const p2 = state.m2 * currentV2View;
+      const totalP = p1 + p2;
+
+      els.ball1.style.width = `${r1 * 2 * scale}px`;
+      els.ball1.style.height = `${r1 * 2 * scale}px`;
+      els.ball1.style.left = `calc(50% + ${viewX1 * scale - r1 * scale}px)`;
+      els.ball1.style.top = `calc(50% - ${r1 * scale}px)`;
+      els.ball1Text.textContent = `${state.m1}kg`;
+      els.ball1V.textContent = `v' = ${currentV1View.toFixed(2)}`;
+
+      els.ball2.style.width = `${r2 * 2 * scale}px`;
+      els.ball2.style.height = `${r2 * 2 * scale}px`;
+      els.ball2.style.left = `calc(50% + ${viewX2 * scale - r2 * scale}px)`;
+      els.ball2.style.top = `calc(50% - ${r2 * scale}px)`;
+      els.ball2Text.textContent = `${state.m2}kg`;
+      els.ball2V.textContent = `v' = ${currentV2View.toFixed(2)}`;
+
+      const gridOffset = (-state.vRef * state.time) % 1;
+      els.gridContainer.style.transform = `translateX(${gridOffset * scale}px)`;
+
+      if (isCollided) {
+        const maxR = Math.max(r1, r2);
+        els.collisionRing.style.display = 'block';
+        els.collisionRing.style.width = `${(r1+r2) * 2 * scale + 24}px`;
+        els.collisionRing.style.height = `${maxR * 2 * scale + 24}px`;
+        els.collisionRing.style.left = `calc(50% + ${viewX1 * scale - r1 * scale - 12}px)`;
+        els.collisionRing.style.top = `calc(50% - ${maxR * scale + 12}px)`;
+        els.collidedAlert.classList.remove('hidden');
+        els.ball1V.style.opacity = "0";
+        els.ball2V.textContent = `Combined v' = ${currentV2View.toFixed(2)}`;
+      } else {
+        els.collisionRing.style.display = 'none';
+        els.collidedAlert.classList.add('hidden');
+        els.ball1V.style.opacity = "1";
+      }
+
+      els.timeDisplay.textContent = state.time.toFixed(2);
+      els.vRefVal.textContent = state.vRef.toFixed(2);
+      els.dashTotalP.textContent = totalP.toFixed(2);
+      els.vRefSlider.value = state.vRef;
+    }
+
+    let lastTime = performance.now();
+    function loop(currentTime) {
+      if (state.isPlaying) {
+        const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.05);
+        state.time += deltaTime;
+        render();
+      }
+      lastTime = currentTime;
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    function togglePlay() {
+      state.isPlaying = !state.isPlaying;
+      if (state.isPlaying) {
+        lastTime = performance.now();
+        els.btnPlay.classList.replace('bg-emerald-500', 'bg-amber-500');
+        els.iconPlay.classList.add('hidden');
+        els.iconPause.classList.remove('hidden');
+        els.playStatus.textContent = 'Running';
+        els.playStatus.classList.replace('text-slate-400', 'text-emerald-500');
+      } else {
+        els.btnPlay.classList.replace('bg-amber-500', 'bg-emerald-500');
+        els.iconPause.classList.add('hidden');
+        els.iconPlay.classList.remove('hidden');
+        els.playStatus.textContent = 'Paused';
+        els.playStatus.classList.replace('text-emerald-500', 'text-slate-400');
+      }
+    }
+
+    function resetSimulation() {
+      state.time = 0;
+      if (state.isPlaying) togglePlay();
+      render();
+    }
+
+    function handleParamChange(paramName, domValElement) {
+      return (e) => {
+        state[paramName] = Number(e.target.value);
+        if (domValElement) {
+          const unit = paramName.startsWith('m') ? 'kg' : 'm/s';
+          domValElement.textContent = `${state[paramName]} ${unit}`;
+        }
+        state.time = 0;
+        if (state.isPlaying) togglePlay();
+        render();
+      };
+    }
+
+    els.btnPlay.addEventListener('click', togglePlay);
+    els.btnReset.addEventListener('click', resetSimulation);
+    els.m1Slider.addEventListener('input', handleParamChange('m1', els.m1Val));
+    els.v1Slider.addEventListener('input', handleParamChange('v1', els.v1Val));
+    els.m2Slider.addEventListener('input', handleParamChange('m2', els.m2Val));
+    els.v2Slider.addEventListener('input', handleParamChange('v2', els.v2Val));
+    els.vRefSlider.addEventListener('input', (e) => {
+      state.vRef = Number(e.target.value);
+      render();
+    });
+    els.btnResetVref.addEventListener('click', () => {
+      state.vRef = 0;
+      render();
+    });
+    els.btnComFrame.addEventListener('click', () => {
+      const vf = (state.m1 * state.v1 + state.m2 * state.v2) / (state.m1 + state.m2);
+      state.vRef = parseFloat(vf.toFixed(2));
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
