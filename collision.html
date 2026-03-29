@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,11 +11,14 @@
     /* 1. 全域字體大小控制：透過 media query 適應手機與電腦 */
     /* ------------------------------------------- */
     body {
-      font-size: 16px; /* 手機版預設字級比較小 */
+      font-size: 16px;
+      /* 手機版預設字級比較小 */
     }
+
     @media (min-width: 768px) {
       body {
-        font-size: 20px; /* 電腦版維持較大字級 */
+        font-size: 20px;
+        /* 電腦版維持較大字級 */
       }
     }
 
@@ -24,6 +28,7 @@
       width: 100%;
       background: transparent;
     }
+
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
       height: 24px;
@@ -32,21 +37,24 @@
       background: currentColor;
       cursor: pointer;
       margin-top: -8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     }
+
     input[type=range]::-webkit-slider-runnable-track {
       width: 100%;
       height: 8px;
       cursor: pointer;
-      background: rgba(0,0,0,0.1);
+      background: rgba(0, 0, 0, 0.1);
       border-radius: 4px;
     }
+
     @media (min-width: 768px) {
       input[type=range]::-webkit-slider-thumb {
         height: 28px;
         width: 28px;
         margin-top: -10px;
       }
+
       input[type=range]::-webkit-slider-runnable-track {
         height: 12px;
         border-radius: 6px;
@@ -62,7 +70,7 @@
       left: 50%;
       transform: translateX(-50%);
       white-space: nowrap;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0, 0, 0, 0.85);
       color: white;
       padding: 2px 6px;
       border-radius: 6px;
@@ -70,9 +78,10 @@
       font-weight: bold;
       font-family: monospace;
       pointer-events: none;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
       z-index: 20;
     }
+
     @media (min-width: 768px) {
       .v-label {
         padding: 4px 10px;
@@ -81,112 +90,150 @@
     }
   </style>
 </head>
+
 <body class="min-h-screen bg-slate-50 p-3 md:p-8 font-sans text-slate-800">
   <div class="max-w-6xl mx-auto space-y-4 md:space-y-6">
-    
+
     <!-- 標題 -->
-    <div class="bg-white rounded-xl md:rounded-2xl shadow-sm p-5 md:p-8 border border-slate-200 text-center md:text-left">
+    <div
+      class="bg-white rounded-xl md:rounded-2xl shadow-sm p-5 md:p-8 border border-slate-200 text-center md:text-left">
       <h1 class="text-2xl md:text-4xl font-black text-slate-900 mb-2 md:mb-3">完全非彈性碰撞：尋找「質心參考系」</h1>
       <p class="text-slate-600 text-sm md:text-xl">
-        調整「<span class="font-bold text-amber-600">參考系速度</span>」找到讓碰撞後合體球<strong class="text-indigo-600">完全靜止</strong>的視角。
+        切換「<span class="font-bold text-amber-600">🌍 地面</span>」與「<span class="font-bold text-amber-600">🚃
+          列車</span>」觀察座標，找到碰撞後合體球<strong class="text-indigo-600">完全靜止</strong>的視角。
       </p>
     </div>
 
     <!-- 動畫顯示區：調整針對手機版縮小高度 -->
-    <div class="bg-slate-900 rounded-xl md:rounded-2xl shadow-inner relative overflow-hidden flex flex-col items-center justify-center border-4 border-slate-800 h-[260px] md:h-[380px]">
+    <div
+      class="bg-slate-900 rounded-xl md:rounded-2xl shadow-inner relative overflow-hidden flex flex-col items-center justify-center border-4 border-slate-800 h-[260px] md:h-[380px]">
       <div id="grid-container" class="absolute inset-0 opacity-20 pointer-events-none"></div>
       <div class="absolute left-0 right-0 h-1 bg-slate-700 top-1/2 -mt-0.5"></div>
 
       <!-- 球 1 -->
-      <div id="ball1" class="absolute rounded-full bg-red-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
+      <div id="ball1"
+        class="absolute rounded-full bg-red-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
         <div class="v-label" id="ball1-v-label">v' = 0.00</div>
         <span id="ball1-text">2kg</span>
       </div>
 
       <!-- 球 2 -->
-      <div id="ball2" class="absolute rounded-full bg-blue-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
+      <div id="ball2"
+        class="absolute rounded-full bg-blue-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
         <div class="v-label" id="ball2-v-label">v' = 0.00</div>
         <span id="ball2-text">3kg</span>
       </div>
 
-      <div id="collision-ring" class="absolute border-4 border-dashed border-yellow-400 rounded-full animate-pulse pointer-events-none hidden"></div>
+      <div id="collision-ring"
+        class="absolute border-4 border-dashed border-yellow-400 rounded-full animate-pulse pointer-events-none hidden">
+      </div>
 
       <!-- 狀態疊加層 -->
-      <div class="absolute top-2 left-2 md:top-6 md:left-6 text-white bg-black/60 px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs md:text-xl font-mono border border-white/20 z-20">
+      <div
+        class="absolute top-2 left-2 md:top-6 md:left-6 text-white bg-black/60 px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs md:text-xl font-mono border border-white/20 z-20">
         時間: <span id="time-display">0.00</span> s
         <span id="collided-alert" class="ml-2 text-yellow-400 font-bold hidden">● 已碰撞</span>
+      </div>
+      <!-- 播放控制：緊貼動畫區域下方 -->
+      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-4 z-30">
+        <button id="btn-play"
+          class="w-14 h-14 md:w-16 md:h-16 rounded-full text-white transition-all shadow-xl bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center hover:scale-105 active:scale-95 backdrop-blur-sm bg-opacity-90">
+          <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8 ml-1" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8 hidden"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+        </button>
+        <button id="btn-reset"
+          class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all flex items-center justify-center shadow-xl backdrop-blur-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
     <!-- 緊湊數據面板 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
       <!-- 參考系控制 -->
-      <div class="lg:col-span-2 bg-amber-50 rounded-xl md:rounded-2xl shadow-sm border border-amber-200 p-5 md:p-8 flex flex-col justify-center">
+      <div
+        class="lg:col-span-2 bg-amber-50 rounded-xl md:rounded-2xl shadow-sm border border-amber-200 p-5 md:p-8 flex flex-col justify-center">
         <div class="flex flex-row justify-between items-end mb-4 md:mb-6">
           <h3 class="text-base md:text-2xl font-bold text-amber-900 flex items-center">
-            <svg class="mr-2 w-5 h-5 md:w-8 md:h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-            觀察者參考系 (v_ref)
+            <svg class="mr-2 w-5 h-5 md:w-8 md:h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+            </svg>
+            觀察座標切換
           </h3>
-          <span id="vRef-val" class="font-mono text-xl md:text-4xl font-black bg-amber-200 px-3 py-1 rounded-lg">0.00</span>
+          <span id="vRef-val"
+            class="font-mono text-xl md:text-4xl font-black bg-amber-200 px-3 py-1 rounded-lg">0.00</span>
         </div>
-        <input type="range" id="vRef-slider" min="-15" max="15" step="0.1" value="0" class="w-full text-amber-600 mb-5 md:mb-6">
+        <input type="range" id="vRef-slider" min="-15" max="15" step="0.1" value="0"
+          class="w-full text-amber-600 mb-5 md:mb-6">
         <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-          <button id="btn-reset-vref" class="flex-1 py-2 md:py-3 bg-white text-slate-700 text-sm md:text-lg font-bold rounded-xl border-2 border-slate-200 hover:bg-slate-100 transition-colors">實驗室系 (v=0)</button>
-          <button id="btn-com-frame" class="flex-1 py-2 md:py-3 bg-amber-600 text-white text-base md:text-xl font-black rounded-xl shadow-md md:shadow-lg hover:bg-amber-700 transition-all active:scale-95">切換至質心系</button>
+          <button id="btn-reset-vref"
+            class="flex-1 py-2.5 md:py-3 bg-white text-slate-700 text-sm md:text-lg font-bold rounded-xl border-2 border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2">
+            <span class="text-lg">🌍</span> 地面上的觀察者
+          </button>
+          <button id="btn-com-frame"
+            class="flex-1 py-2.5 md:py-3 bg-amber-600 text-white text-sm md:text-lg font-black rounded-xl shadow-md md:shadow-lg hover:bg-amber-700 transition-all active:scale-95 flex items-center justify-center gap-2">
+            <span class="text-lg">🚃</span> 列車中的觀察者
+          </button>
         </div>
+        <p class="text-xs md:text-sm text-amber-700 mt-3 opacity-80">💡 「列車中的觀察者」= 以質心速度移動的參考系，碰撞後合體靜止</p>
       </div>
 
       <!-- 總動量 -->
-      <div class="bg-indigo-700 rounded-xl md:rounded-2xl shadow-md md:shadow-xl p-5 md:p-8 flex flex-col items-center justify-center text-white border-b-4 md:border-b-8 border-indigo-900">
+      <div
+        class="bg-indigo-700 rounded-xl md:rounded-2xl shadow-md md:shadow-xl p-5 md:p-8 flex flex-col items-center justify-center text-white border-b-4 md:border-b-8 border-indigo-900">
         <h3 class="text-sm md:text-xl font-bold opacity-90 mb-1 md:mb-2">系統總動量 (P)</h3>
         <div class="text-4xl md:text-6xl font-black font-mono tracking-tighter" id="dash-totalp">2.00</div>
         <p class="text-[10px] md:text-sm mt-1 md:mt-4 opacity-80 font-medium">kg·m/s (始終守恆)</p>
       </div>
     </div>
 
-    <!-- 參數與播放控制 -->
+    <!-- 參數調節 -->
     <div class="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 p-5 md:p-8 mb-8 md:mb-0">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-10">
-        <!-- 播放控制 -->
-        <div class="lg:col-span-3 flex flex-row lg:flex-col items-center justify-between lg:justify-center border-b lg:border-b-0 lg:border-r border-slate-100 pb-5 lg:pb-0">
-          <div class="flex space-x-4 md:space-x-6">
-            <button id="btn-play" class="w-14 h-14 md:w-20 md:h-20 rounded-full text-white transition-all shadow-lg md:shadow-xl bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center hover:scale-105 active:scale-95">
-              <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-10 md:h-10 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-10 md:h-10 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-            </button>
-            <button id="btn-reset" class="w-14 h-14 md:w-20 md:h-20 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all flex items-center justify-center shadow-sm md:shadow-md">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-9 md:h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-            </button>
-          </div>
-          <div id="play-status" class="text-base md:text-xl mt-0 md:mt-4 font-black text-slate-400 uppercase tracking-widest hidden lg:block">Paused</div>
-        </div>
-
-        <!-- 參數調節 -->
-        <div class="lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-          <div class="bg-red-50/50 p-4 rounded-xl border border-red-100">
-            <div class="text-red-600 font-black mb-3 md:mb-4 border-b-2 border-red-200 pb-1 text-base md:text-xl tracking-tight">🔴 左球 m₁ / v₁</div>
-            <div class="space-y-4">
-              <div>
-                <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m1-val" class="font-mono text-base md:text-xl">2 kg</span></div>
-                <input type="range" id="m1-slider" min="1" max="10" step="1" value="2" class="w-full accent-red-500">
-              </div>
-              <div>
-                <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (Lab)</span><span id="v1-val" class="font-mono text-base md:text-xl">4 m/s</span></div>
-                <input type="range" id="v1-slider" min="-10" max="10" step="1" value="4" class="w-full accent-red-500">
-              </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+        <div class="bg-red-50/50 p-4 rounded-xl border border-red-100">
+          <div
+            class="text-red-600 font-black mb-3 md:mb-4 border-b-2 border-red-200 pb-1 text-base md:text-xl tracking-tight">
+            🔴 左球 m₁ / v₁</div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m1-val"
+                  class="font-mono text-base md:text-xl">2 kg</span></div>
+              <input type="range" id="m1-slider" min="1" max="10" step="1" value="2" class="w-full accent-red-500">
+            </div>
+            <div>
+              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (地面)</span><span
+                  id="v1-val" class="font-mono text-base md:text-xl">4 m/s</span></div>
+              <input type="range" id="v1-slider" min="-10" max="10" step="1" value="4" class="w-full accent-red-500">
             </div>
           </div>
-          <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-            <div class="text-blue-600 font-black mb-3 md:mb-4 border-b-2 border-blue-200 pb-1 text-base md:text-xl tracking-tight">🔵 右球 m₂ / v₂</div>
-            <div class="space-y-4">
-              <div>
-                <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m2-val" class="font-mono text-base md:text-xl">3 kg</span></div>
-                <input type="range" id="m2-slider" min="1" max="10" step="1" value="3" class="w-full accent-blue-500">
-              </div>
-              <div>
-                <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (Lab)</span><span id="v2-val" class="font-mono text-base md:text-xl">-2 m/s</span></div>
-                <input type="range" id="v2-slider" min="-10" max="10" step="1" value="-2" class="w-full accent-blue-500">
-              </div>
+        </div>
+        <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+          <div
+            class="text-blue-600 font-black mb-3 md:mb-4 border-b-2 border-blue-200 pb-1 text-base md:text-xl tracking-tight">
+            🔵 右球 m₂ / v₂</div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m2-val"
+                  class="font-mono text-base md:text-xl">3 kg</span></div>
+              <input type="range" id="m2-slider" min="1" max="10" step="1" value="3" class="w-full accent-blue-500">
+            </div>
+            <div>
+              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (地面)</span><span
+                  id="v2-val" class="font-mono text-base md:text-xl">-2 m/s</span></div>
+              <input type="range" id="v2-slider" min="-10" max="10" step="1" value="-2" class="w-full accent-blue-500">
             </div>
           </div>
         </div>
@@ -214,7 +261,7 @@
       timeDisplay: document.getElementById('time-display'),
       collidedAlert: document.getElementById('collided-alert'),
       gridContainer: document.getElementById('grid-container'),
-      
+
       vRefSlider: document.getElementById('vRef-slider'),
       vRefVal: document.getElementById('vRef-val'),
       m1Slider: document.getElementById('m1-slider'),
@@ -231,7 +278,7 @@
       btnPlay: document.getElementById('btn-play'),
       iconPlay: document.getElementById('icon-play'),
       iconPause: document.getElementById('icon-pause'),
-      playStatus: document.getElementById('play-status'),
+
       btnReset: document.getElementById('btn-reset'),
       btnResetVref: document.getElementById('btn-reset-vref'),
       btnComFrame: document.getElementById('btn-com-frame')
@@ -239,7 +286,7 @@
 
     // Responsive scale
     let scale = window.innerWidth < 768 ? 20 : 40;
-    
+
     window.addEventListener('resize', () => {
       const newScale = window.innerWidth < 768 ? 20 : 40;
       if (newScale !== scale) {
@@ -261,9 +308,9 @@
     initGrid();
 
     function render() {
-      const initialX1 = -6; 
-      const initialX2 = 6;  
-      const r1 = 0.45 + 0.1 * state.m1; 
+      const initialX1 = -6;
+      const initialX2 = 6;
+      const r1 = 0.45 + 0.1 * state.m1;
       const r2 = 0.45 + 0.1 * state.m2;
 
       const relV = state.v1 - state.v2;
@@ -278,7 +325,7 @@
         labX2 = initialX2 + state.v2 * state.time;
       } else {
         const collX1 = initialX1 + state.v1 * tc;
-        const collX2 = collX1 + r1 + r2; 
+        const collX2 = collX1 + r1 + r2;
         labX1 = collX1 + vf * (state.time - tc);
         labX2 = collX2 + vf * (state.time - tc);
       }
@@ -314,10 +361,10 @@
         const maxR = Math.max(r1, r2);
         const padding = scale === 20 ? 12 : 24;
         els.collisionRing.style.display = 'block';
-        els.collisionRing.style.width = `${(r1+r2) * 2 * scale + padding}px`;
+        els.collisionRing.style.width = `${(r1 + r2) * 2 * scale + padding}px`;
         els.collisionRing.style.height = `${maxR * 2 * scale + padding}px`;
-        els.collisionRing.style.left = `calc(50% + ${viewX1 * scale - r1 * scale - (padding/2)}px)`;
-        els.collisionRing.style.top = `calc(50% - ${maxR * scale + (padding/2)}px)`;
+        els.collisionRing.style.left = `calc(50% + ${viewX1 * scale - r1 * scale - (padding / 2)}px)`;
+        els.collisionRing.style.top = `calc(50% - ${maxR * scale + (padding / 2)}px)`;
         els.collidedAlert.classList.remove('hidden');
         els.ball1V.style.opacity = "0";
         els.ball2V.textContent = `合體 v' = ${currentV2View.toFixed(2)}`;
@@ -352,14 +399,10 @@
         els.btnPlay.classList.replace('bg-emerald-500', 'bg-amber-500');
         els.iconPlay.classList.add('hidden');
         els.iconPause.classList.remove('hidden');
-        els.playStatus.textContent = 'Running';
-        els.playStatus.classList.replace('text-slate-400', 'text-emerald-500');
       } else {
         els.btnPlay.classList.replace('bg-amber-500', 'bg-emerald-500');
         els.iconPause.classList.add('hidden');
         els.iconPlay.classList.remove('hidden');
-        els.playStatus.textContent = 'Paused';
-        els.playStatus.classList.replace('text-emerald-500', 'text-slate-400');
       }
     }
 
@@ -405,4 +448,5 @@
     render();
   </script>
 </body>
+
 </html>
