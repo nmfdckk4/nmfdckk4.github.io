@@ -1,452 +1,539 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>完全非彈性碰撞：尋找「質心參考系」</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* ------------------------------------------- */
-    /* 1. 全域字體大小控制：透過 media query 適應手機與電腦 */
-    /* ------------------------------------------- */
-    body {
-      font-size: 16px;
-      /* 手機版預設字級比較小 */
-    }
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Noto+Sans+TC:wght@400;700;900&display=swap');
 
-    @media (min-width: 768px) {
-      body {
-        font-size: 20px;
-        /* 電腦版維持較大字級 */
+    :root {
+      --bg:      #09111f;
+      --surface: #131f30;
+      --card:    #1a2840;
+      --border:  #2a3f5c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: var(--bg);
+      color: #dde6f0;
+      min-height: 100vh;
+      padding: 1rem 1.4rem 1.6rem;
+      font-size: 19px;
+    }
+    @media (min-width: 1100px) { body { padding: 1.2rem 2rem 1.8rem; font-size: 21px; } }
+
+    /* ── Master Grid ── */
+    .master {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.2rem;
+    }
+    @media (min-width: 900px) {
+      .master {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto; 
+        align-items: stretch;
+      }
+      /* 讓播放按鈕橫跨兩欄 */
+      .full-width-grid {
+        grid-column: 1 / -1;
       }
     }
 
-    /* 滑桿外觀自訂與響應式 */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.1rem 1.4rem;
+      height: 100%;
+    }
+    .card-title {
+      font-weight: 900;
+      font-size: 1rem;
+      margin-bottom: .75rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
     input[type=range] {
       -webkit-appearance: none;
-      width: 100%;
-      background: transparent;
+      width: 100%; background: transparent; cursor: pointer;
     }
-
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 10px; border-radius: 5px; background: #243450;
+    }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      height: 24px;
-      width: 24px;
-      border-radius: 50%;
-      background: currentColor;
-      cursor: pointer;
-      margin-top: -8px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      width: 30px; height: 30px; border-radius: 50%;
+      background: currentColor; margin-top: -10px; cursor: pointer;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.12);
     }
 
-    input[type=range]::-webkit-slider-runnable-track {
-      width: 100%;
-      height: 8px;
-      cursor: pointer;
-      background: rgba(0, 0, 0, 0.1);
-      border-radius: 4px;
+    .viewport {
+      position: relative; overflow: hidden;
+      background: #060d19;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      height: 290px;
     }
+    @media (min-width: 1100px) { .viewport { height: 320px; } }
 
-    @media (min-width: 768px) {
-      input[type=range]::-webkit-slider-thumb {
-        height: 28px;
-        width: 28px;
-        margin-top: -10px;
-      }
+    .vp-grid { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+    .vp-grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(80,130,200,.14); }
+    .vp-horizon { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(255,255,255,.1); pointer-events: none; }
+    .vp-scenery { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 
-      input[type=range]::-webkit-slider-runnable-track {
-        height: 12px;
-        border-radius: 6px;
-      }
+    .ball {
+      position: absolute; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800; color: #fff;
+      font-size: 1rem; transition: none; z-index: 20;
     }
-
-    /* ------------------------------------------- */
-    /* 2. 球體上方標籤字體：修改這裡調整球上的文字大小 */
-    /* ------------------------------------------- */
     .v-label {
-      position: absolute;
-      bottom: 115%;
-      left: 50%;
-      transform: translateX(-50%);
-      white-space: nowrap;
-      background: rgba(0, 0, 0, 0.85);
-      color: white;
-      padding: 2px 6px;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      font-family: monospace;
-      pointer-events: none;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      z-index: 20;
+      position: absolute; bottom: 115%; left: 50%;
+      transform: translateX(-50%); white-space: nowrap;
+      background: rgba(0,0,0,.88); color: #fff;
+      padding: 4px 11px; border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem; font-weight: 700;
+      pointer-events: none; z-index: 30;
+      border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 2px 10px rgba(0,0,0,.5);
     }
 
-    @media (min-width: 768px) {
-      .v-label {
-        padding: 4px 10px;
-        font-size: 1.1rem;
-      }
+    .collision-ring {
+      position: absolute; border: 4px dashed #fbbf24; border-radius: 50%;
+      animation: blink .85s infinite; pointer-events: none; z-index: 22;
     }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    .vp-badge {
+      position: absolute; top: 11px; left: 13px;
+      background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,.18);
+      border-radius: 10px; padding: 5px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem; font-weight: 700; z-index: 40;
+    }
+    .vp-time {
+      position: absolute; top: 11px; right: 13px;
+      background: rgba(0,0,0,.75); border: 1px solid rgba(255,255,255,.18);
+      border-radius: 10px; padding: 5px 14px;
+      font-family: 'JetBrains Mono', monospace; font-size: 1rem; z-index: 40;
+    }
+
+    .p-strip {
+      background: linear-gradient(135deg, #0f2744, #060d19);
+      border: 1px solid #1d4ed8;
+      border-radius: 12px;
+      margin-top: .6rem;
+      padding: .6rem 1.2rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .btn-circle {
+      width: 62px; height: 62px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; cursor: pointer;
+      transition: transform .12s, filter .12s;
+    }
+    .btn-circle:hover  { transform: scale(1.07); }
+    .btn-circle:active { transform: scale(.94); }
+
+    .cdot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: #fbbf24;
+      margin-right: 6px; animation: blink .85s infinite;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
   </style>
 </head>
+<body>
 
-<body class="min-h-screen bg-slate-50 p-3 md:p-8 font-sans text-slate-800">
-  <div class="max-w-6xl mx-auto space-y-4 md:space-y-6">
+<div style="margin-bottom:1.2rem">
+  <h1 style="font-size:1.75rem;font-weight:900;color:#fff;line-height:1.2">
+    完全非彈性碰撞 <span style="color:#f59e0b">·</span> 質心參考系
+  </h1>
+  <p style="font-size:.95rem;color:#64748b;margin-top:.3rem">
+    調整下方參數，觀察不同參考系下的動量守恆與碰撞過程。
+  </p>
+</div>
 
-    <!-- 標題 -->
-    <div
-      class="bg-white rounded-xl md:rounded-2xl shadow-sm p-5 md:p-8 border border-slate-200 text-center md:text-left">
-      <h1 class="text-2xl md:text-4xl font-black text-slate-900 mb-2 md:mb-3">完全非彈性碰撞：尋找「質心參考系」</h1>
-      <p class="text-slate-600 text-sm md:text-xl">
-        切換「<span class="font-bold text-amber-600">🌍 地面</span>」與「<span class="font-bold text-amber-600">🚃
-          列車</span>」觀察座標，找到碰撞後合體球<strong class="text-indigo-600">完全靜止</strong>的視角。
-      </p>
-    </div>
+<div class="master">
 
-    <!-- 動畫顯示區：調整針對手機版縮小高度 -->
-    <div
-      class="bg-slate-900 rounded-xl md:rounded-2xl shadow-inner relative overflow-hidden flex flex-col items-center justify-center border-4 border-slate-800 h-[260px] md:h-[380px]">
-      <div id="grid-container" class="absolute inset-0 opacity-20 pointer-events-none"></div>
-      <div class="absolute left-0 right-0 h-1 bg-slate-700 top-1/2 -mt-0.5"></div>
-
-      <!-- 球 1 -->
-      <div id="ball1"
-        class="absolute rounded-full bg-red-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
-        <div class="v-label" id="ball1-v-label">v' = 0.00</div>
-        <span id="ball1-text">2kg</span>
+  <div style="display:flex;flex-direction:column;gap:1rem">
+    <div class="card">
+      <div class="card-title" style="color:#f87171">
+        <span style="width:14px;height:14px;border-radius:50%;background:#ef4444;display:inline-block;flex-shrink:0"></span>
+        左球 m₁ / v₁
       </div>
-
-      <!-- 球 2 -->
-      <div id="ball2"
-        class="absolute rounded-full bg-blue-500 shadow-xl flex items-center justify-center text-white font-bold text-sm md:text-xl transition-none z-10">
-        <div class="v-label" id="ball2-v-label">v' = 0.00</div>
-        <span id="ball2-text">3kg</span>
-      </div>
-
-      <div id="collision-ring"
-        class="absolute border-4 border-dashed border-yellow-400 rounded-full animate-pulse pointer-events-none hidden">
-      </div>
-
-      <!-- 狀態疊加層 -->
-      <div
-        class="absolute top-2 left-2 md:top-6 md:left-6 text-white bg-black/60 px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs md:text-xl font-mono border border-white/20 z-20">
-        時間: <span id="time-display">0.00</span> s
-        <span id="collided-alert" class="ml-2 text-yellow-400 font-bold hidden">● 已碰撞</span>
-      </div>
-      <!-- 播放控制：緊貼動畫區域下方 -->
-      <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex space-x-4 z-30">
-        <button id="btn-play"
-          class="w-14 h-14 md:w-16 md:h-16 rounded-full text-white transition-all shadow-xl bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center hover:scale-105 active:scale-95 backdrop-blur-sm bg-opacity-90">
-          <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8 ml-1" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" stroke-width="2.5">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8 hidden"
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <rect x="6" y="4" width="4" height="16"></rect>
-            <rect x="14" y="4" width="4" height="16"></rect>
-          </svg>
-        </button>
-        <button id="btn-reset"
-          class="w-14 h-14 md:w-16 md:h-16 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all flex items-center justify-center shadow-xl backdrop-blur-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-8 md:h-8" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2.5">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-            <path d="M3 3v5h5"></path>
-          </svg>
-        </button>
-      </div>
-    </div>
-
-    <!-- 緊湊數據面板 -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-      <!-- 參考系控制 -->
-      <div
-        class="lg:col-span-2 bg-amber-50 rounded-xl md:rounded-2xl shadow-sm border border-amber-200 p-5 md:p-8 flex flex-col justify-center">
-        <div class="flex flex-row justify-between items-end mb-4 md:mb-6">
-          <h3 class="text-base md:text-2xl font-bold text-amber-900 flex items-center">
-            <svg class="mr-2 w-5 h-5 md:w-8 md:h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2.5">
-              <circle cx="12" cy="12" r="10"></circle>
-              <circle cx="12" cy="12" r="2"></circle>
-            </svg>
-            觀察座標切換
-          </h3>
-          <span id="vRef-val"
-            class="font-mono text-xl md:text-4xl font-black bg-amber-200 px-3 py-1 rounded-lg">0.00</span>
-        </div>
-        <input type="range" id="vRef-slider" min="-15" max="15" step="0.1" value="0"
-          class="w-full text-amber-600 mb-5 md:mb-6">
-        <div class="flex flex-col sm:flex-row gap-3 md:gap-4">
-          <button id="btn-reset-vref"
-            class="flex-1 py-2.5 md:py-3 bg-white text-slate-700 text-sm md:text-lg font-bold rounded-xl border-2 border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2">
-            <span class="text-lg">🌍</span> 地面上的觀察者
-          </button>
-          <button id="btn-com-frame"
-            class="flex-1 py-2.5 md:py-3 bg-amber-600 text-white text-sm md:text-lg font-black rounded-xl shadow-md md:shadow-lg hover:bg-amber-700 transition-all active:scale-95 flex items-center justify-center gap-2">
-            <span class="text-lg">🚃</span> 列車中的觀察者
-          </button>
-        </div>
-        <p class="text-xs md:text-sm text-amber-700 mt-3 opacity-80">💡 「列車中的觀察者」= 以質心速度移動的參考系，碰撞後合體靜止</p>
-      </div>
-
-      <!-- 總動量 -->
-      <div
-        class="bg-indigo-700 rounded-xl md:rounded-2xl shadow-md md:shadow-xl p-5 md:p-8 flex flex-col items-center justify-center text-white border-b-4 md:border-b-8 border-indigo-900">
-        <h3 class="text-sm md:text-xl font-bold opacity-90 mb-1 md:mb-2">系統總動量 (P)</h3>
-        <div class="text-4xl md:text-6xl font-black font-mono tracking-tighter" id="dash-totalp">2.00</div>
-        <p class="text-[10px] md:text-sm mt-1 md:mt-4 opacity-80 font-medium">kg·m/s (始終守恆)</p>
-      </div>
-    </div>
-
-    <!-- 參數調節 -->
-    <div class="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 p-5 md:p-8 mb-8 md:mb-0">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
-        <div class="bg-red-50/50 p-4 rounded-xl border border-red-100">
-          <div
-            class="text-red-600 font-black mb-3 md:mb-4 border-b-2 border-red-200 pb-1 text-base md:text-xl tracking-tight">
-            🔴 左球 m₁ / v₁</div>
-          <div class="space-y-4">
-            <div>
-              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m1-val"
-                  class="font-mono text-base md:text-xl">2 kg</span></div>
-              <input type="range" id="m1-slider" min="1" max="10" step="1" value="2" class="w-full accent-red-500">
-            </div>
-            <div>
-              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (地面)</span><span
-                  id="v1-val" class="font-mono text-base md:text-xl">4 m/s</span></div>
-              <input type="range" id="v1-slider" min="-10" max="10" step="1" value="4" class="w-full accent-red-500">
-            </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;color:#94a3b8;margin-bottom:.4rem">
+            <span>質量</span>
+            <span class="mono" style="color:#fff;font-size:1.1rem;font-weight:700" id="m1-val">2 kg</span>
           </div>
+          <input type="range" id="m1-slider" min="1" max="10" step="1" value="2" class="accent-red-500">
         </div>
-        <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-          <div
-            class="text-blue-600 font-black mb-3 md:mb-4 border-b-2 border-blue-200 pb-1 text-base md:text-xl tracking-tight">
-            🔵 右球 m₂ / v₂</div>
-          <div class="space-y-4">
-            <div>
-              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>質量</span><span id="m2-val"
-                  class="font-mono text-base md:text-xl">3 kg</span></div>
-              <input type="range" id="m2-slider" min="1" max="10" step="1" value="3" class="w-full accent-blue-500">
-            </div>
-            <div>
-              <div class="flex justify-between font-bold mb-2 text-sm md:text-base"><span>初速 (地面)</span><span
-                  id="v2-val" class="font-mono text-base md:text-xl">-2 m/s</span></div>
-              <input type="range" id="v2-slider" min="-10" max="10" step="1" value="-2" class="w-full accent-blue-500">
-            </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;color:#94a3b8;margin-bottom:.4rem">
+            <span>初速</span>
+            <span class="mono" style="color:#fff;font-size:1.1rem;font-weight:700" id="v1-val">4 m/s</span>
           </div>
+          <input type="range" id="v1-slider" min="-10" max="10" step="1" value="4" class="accent-red-500">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="color:#60a5fa">
+        <span style="width:14px;height:14px;border-radius:50%;background:#3b82f6;display:inline-block;flex-shrink:0"></span>
+        右球 m₂ / v₂
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;color:#94a3b8;margin-bottom:.4rem">
+            <span>質量</span>
+            <span class="mono" style="color:#fff;font-size:1.1rem;font-weight:700" id="m2-val">3 kg</span>
+          </div>
+          <input type="range" id="m2-slider" min="1" max="10" step="1" value="3" class="accent-blue-500">
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.95rem;color:#94a3b8;margin-bottom:.4rem">
+            <span>初速</span>
+            <span class="mono" style="color:#fff;font-size:1.1rem;font-weight:700" id="v2-val">-2 m/s</span>
+          </div>
+          <input type="range" id="v2-slider" min="-10" max="10" step="1" value="-2" class="accent-blue-500">
         </div>
       </div>
     </div>
   </div>
 
-  <script>
-    const state = {
-      m1: 2, v1: 4,
-      m2: 3, v2: -2,
-      vRef: 0,
-      time: 0,
-      isPlaying: false
-    };
+  <div class="card">
+    <div class="card-title" style="color:#fbbf24">
+      🚃 右視窗參考速度 v<sub>ref</sub>
+      <span class="mono" style="margin-left:auto;font-size:1.8rem;font-weight:900;color:#fbbf24" id="vref-display">0.00</span>
+    </div>
+    <input type="range" id="vRef-slider" min="-15" max="15" step="0.1" value="0" class="accent-amber-500" style="margin-bottom:.9rem">
+    <div style="display:flex;gap:.8rem">
+      <button id="btn-reset-vref" style="flex:1;padding:.7rem;border-radius:10px;background:#243450;border:1px solid var(--border);color:#e2e8f0;font-size:1rem;font-weight:700;cursor:pointer;">
+        🌍 重置為地面
+      </button>
+      <button id="btn-com-frame" style="flex:1;padding:.7rem;border-radius:10px;background:#d97706;color:#fff;font-size:1rem;font-weight:900;cursor:pointer;">
+        🚃 切換至質心系
+      </button>
+    </div>
+    <p style="font-size:.9rem;color:#475569;margin-top:.65rem">
+      💡 質心速度 v<sub>cm</sub> = (m₁v₁ + m₂v₂)/(m₁+m₂)，切換後右視窗合體球速度歸零
+    </p>
+  </div>
 
-    const els = {
-      ball1: document.getElementById('ball1'),
-      ball1V: document.getElementById('ball1-v-label'),
-      ball2: document.getElementById('ball2'),
-      ball2V: document.getElementById('ball2-v-label'),
-      ball1Text: document.getElementById('ball1-text'),
-      ball2Text: document.getElementById('ball2-text'),
-      collisionRing: document.getElementById('collision-ring'),
-      timeDisplay: document.getElementById('time-display'),
-      collidedAlert: document.getElementById('collided-alert'),
-      gridContainer: document.getElementById('grid-container'),
+  <div class="card full-width-grid" style="display:flex;align-items:center;gap:1.2rem;padding:.85rem 1.4rem">
+    <button id="btn-play" class="btn-circle" style="background:#10b981">
+      <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="margin-left:3px">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" style="display:none">
+        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+      </svg>
+    </button>
+    <button id="btn-reset" class="btn-circle" style="background:#334155">
+      <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+      </svg>
+    </button>
+    <div style="display:flex;flex-direction:column">
+      <span style="color:#fff;font-weight:700;font-size:1.1rem">模擬控制</span>
+      <span style="color:#64748b;font-size:0.9rem">調整上方參數後，點擊播放觀察碰撞過程</span>
+    </div>
+  </div>
 
-      vRefSlider: document.getElementById('vRef-slider'),
-      vRefVal: document.getElementById('vRef-val'),
-      m1Slider: document.getElementById('m1-slider'),
-      m1Val: document.getElementById('m1-val'),
-      v1Slider: document.getElementById('v1-slider'),
-      v1Val: document.getElementById('v1-val'),
-      m2Slider: document.getElementById('m2-slider'),
-      m2Val: document.getElementById('m2-val'),
-      v2Slider: document.getElementById('v2-slider'),
-      v2Val: document.getElementById('v2-val'),
+  <div>
+    <div class="viewport" id="vp-left">
+      <div class="vp-grid" id="grid-left"></div>
+      <div class="vp-horizon"></div>
+      <svg class="vp-scenery" id="scenery-left" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="vp-badge" style="color:#34d399">🌍 地面參考系 &nbsp;v<sub>ref</sub> = 0</div>
+      <div class="vp-time" style="color:#cbd5e1">
+        <span id="collided-left" style="display:none"><span class="cdot"></span></span>
+        t = <span id="time-left">0.00</span> s
+      </div>
+      <div class="ball" id="b1l" style="background:#ef4444;box-shadow:0 0 24px rgba(239,68,68,.7)">
+        <div class="v-label" id="b1l-v">v=0.00</div>
+        <span id="b1l-t">2kg</span>
+      </div>
+      <div class="ball" id="b2l" style="background:#3b82f6;box-shadow:0 0 24px rgba(59,130,246,.7)">
+        <div class="v-label" id="b2l-v">v=0.00</div>
+        <span id="b2l-t">3kg</span>
+      </div>
+      <div class="collision-ring" id="ring-left" style="display:none"></div>
+    </div>
+    <div class="p-strip">
+      <span style="color:#93c5fd;font-weight:700;font-size:1rem">總動量 P（地面）</span>
+      <span class="mono" style="color:#fff;font-size:1.7rem;font-weight:800" id="p-left">0.00</span>
+      <span style="color:#475569;font-size:.9rem">kg·m/s</span>
+    </div>
+  </div>
 
-      dashTotalP: document.getElementById('dash-totalp'),
+  <div>
+    <div class="viewport" id="vp-right">
+      <div class="vp-grid" id="grid-right"></div>
+      <div class="vp-horizon"></div>
+      <svg class="vp-scenery" id="scenery-right" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="vp-badge" style="color:#fcd34d">
+        🚃 可調參考系 &nbsp;v<sub>ref</sub> = <span id="vref-badge">0.00</span>
+      </div>
+      <div class="vp-time" style="color:#cbd5e1">
+        <span id="collided-right" style="display:none"><span class="cdot"></span></span>
+        t = <span id="time-right">0.00</span> s
+      </div>
+      <div class="ball" id="b1r" style="background:#f87171;box-shadow:0 0 24px rgba(239,68,68,.5)">
+        <div class="v-label" id="b1r-v">v'=0.00</div>
+        <span id="b1r-t">2kg</span>
+      </div>
+      <div class="ball" id="b2r" style="background:#60a5fa;box-shadow:0 0 24px rgba(59,130,246,.5)">
+        <div class="v-label" id="b2r-v">v'=0.00</div>
+        <span id="b2r-t">3kg</span>
+      </div>
+      <div class="collision-ring" id="ring-right" style="display:none"></div>
+    </div>
+    <div class="p-strip">
+      <span style="color:#93c5fd;font-weight:700;font-size:1rem">總動量 P（此參考系）</span>
+      <span class="mono" style="color:#fff;font-size:1.7rem;font-weight:800" id="p-right">0.00</span>
+      <span style="color:#475569;font-size:.9rem">kg·m/s</span>
+    </div>
+  </div>
 
-      btnPlay: document.getElementById('btn-play'),
-      iconPlay: document.getElementById('icon-play'),
-      iconPause: document.getElementById('icon-pause'),
+</div>
 
-      btnReset: document.getElementById('btn-reset'),
-      btnResetVref: document.getElementById('btn-reset-vref'),
-      btnComFrame: document.getElementById('btn-com-frame')
-    };
+<script>
+// JavaScript 邏輯完全相同，保持原樣
+const state = { m1:2, v1:4, m2:3, v2:-2, vRef:0, time:0, isPlaying:false };
+const $ = id => document.getElementById(id);
 
-    // Responsive scale
-    let scale = window.innerWidth < 768 ? 20 : 40;
+function getScale() {
+  const vpW = $('vp-left').offsetWidth || 500;
+  return Math.max(14, Math.min(32, vpW / 22));
+}
+let scale = 22;
+const BALL_Y = 0.5; 
 
-    window.addEventListener('resize', () => {
-      const newScale = window.innerWidth < 768 ? 20 : 40;
-      if (newScale !== scale) {
-        scale = newScale;
-        initGrid();
-        render();
-      }
-    });
+function buildGrid(container) {
+  container.innerHTML = '';
+  for (let i = -80; i <= 80; i++) {
+    const d = document.createElement('div');
+    d.className = 'vp-grid-line';
+    d.style.left = `calc(50% + ${i * scale}px)`;
+    container.appendChild(d);
+  }
+}
+function buildGrids() {
+  scale = getScale();
+  buildGrid($('grid-left'));
+  buildGrid($('grid-right'));
+}
 
-    function initGrid() {
-      els.gridContainer.innerHTML = '';
-      for (let i = -100; i <= 100; i++) {
-        const line = document.createElement('div');
-        line.className = 'absolute top-0 bottom-0 w-px bg-white';
-        line.style.left = `calc(50% + ${i * scale}px)`;
-        els.gridContainer.appendChild(line);
-      }
-    }
-    initGrid();
+const TILE_W   = 320;  
+const TREE_Y   = 0.52; 
+const CLOUD_Y  = [0.08, 0.15, 0.10];
 
-    function render() {
-      const initialX1 = -6;
-      const initialX2 = 6;
-      const r1 = 0.45 + 0.1 * state.m1;
-      const r2 = 0.45 + 0.1 * state.m2;
+function makeTree(cx, H, seed) {
+  const baseY  = H * TREE_Y;
+  const trunkH = H * 0.19;
+  const trunkW = 9 + (seed % 3) * 3;
+  const canR   = 24 + (seed % 4) * 9;
+  const tY     = baseY - trunkH;
+  const cY     = tY - canR * 0.52;
+  const greens = ['#1a5c2a','#256b35','#166128','#2e7d3c'];
+  const col    = greens[seed % greens.length];
+  return `<rect x="${cx-trunkW/2}" y="${tY}" width="${trunkW}" height="${trunkH}" fill="#6b4c2a" rx="3"/><ellipse cx="${cx}" cy="${cY}" rx="${canR}" ry="${canR*.84}" fill="${col}"/>`;
+}
 
-      const relV = state.v1 - state.v2;
-      const tc = relV > 0 ? (initialX2 - initialX1 - r1 - r2) / relV : Infinity;
-      const vf = (state.m1 * state.v1 + state.m2 * state.v2) / (state.m1 + state.m2);
+function makeCloud(cx, H, seed) {
+  const cy  = H * CLOUD_Y[seed % CLOUD_Y.length];
+  const w   = 48 + (seed % 3) * 18;
+  const col = 'rgba(180,200,220,.22)';
+  return `<ellipse cx="${cx}" cy="${cy}" rx="${w*.58}" ry="${w*.26}" fill="${col}"/>`;
+}
 
-      const isCollided = state.time >= tc && tc > 0;
+function makeRoadDash(cx, H) {
+  const roadTop = H * TREE_Y;
+  const midY    = roadTop + (H - roadTop) * 0.45;
+  return `<rect x="${cx-20}" y="${midY-4}" width="40" height="8" fill="rgba(255,255,255,.18)" rx="4"/>`;
+}
 
-      let labX1, labX2;
-      if (!isCollided) {
-        labX1 = initialX1 + state.v1 * state.time;
-        labX2 = initialX2 + state.v2 * state.time;
-      } else {
-        const collX1 = initialX1 + state.v1 * tc;
-        const collX2 = collX1 + r1 + r2;
-        labX1 = collX1 + vf * (state.time - tc);
-        labX2 = collX2 + vf * (state.time - tc);
-      }
+function buildSVGScenery(svgEl) {
+  const vp     = svgEl.parentElement;
+  const W      = vp.offsetWidth  || 500;
+  const H      = vp.offsetHeight || 300;
+  const nTiles = Math.ceil(W / TILE_W) + 6;
+  const s0     = -Math.ceil(nTiles / 2) - 1;
+  const s1     =  Math.ceil(nTiles / 2) + 1;
+  const treeFracs   = [0.06, 0.50, 0.94];
+  const cloudFracs  = [0.14, 0.50, 0.85];
+  const dashFracs   = [0.14, 0.50, 0.84];
+  let svg = '';
+  for (let t = s0; t <= s1; t++) {
+    const ox = t * TILE_W;
+    cloudFracs.forEach((f,i) => { svg += makeCloud(ox + f*TILE_W, H, t*5+i+7);  });
+    treeFracs.forEach((f,i)  => { svg += makeTree( ox + f*TILE_W, H, t*7+i+2);  });
+    dashFracs.forEach((f)    => { svg += makeRoadDash(ox + f*TILE_W, H); });
+  }
+  const cx = W / 2;
+  svgEl.innerHTML = `<g id="${svgEl.id}-g" transform="translate(${cx},0)">${svg}</g>`;
+}
 
-      const viewX1 = labX1 - state.vRef * state.time;
-      const viewX2 = labX2 - state.vRef * state.time;
+function buildSceneries() {
+  buildSVGScenery($('scenery-left'));
+  buildSVGScenery($('scenery-right'));
+}
 
-      const currentV1View = !isCollided ? (state.v1 - state.vRef) : (vf - state.vRef);
-      const currentV2View = !isCollided ? (state.v2 - state.vRef) : (vf - state.vRef);
+function scrollScenery(svgId, offsetPx) {
+  const W  = $(svgId).parentElement.offsetWidth || 500;
+  const g  = $(svgId + '-g');
+  if (g) g.setAttribute('transform', `translate(${W/2 + offsetPx},0)`);
+}
 
-      const p1 = state.m1 * currentV1View;
-      const p2 = state.m2 * currentV2View;
-      const totalP = p1 + p2;
+function physics() {
+  const { m1, v1, m2, v2, time } = state;
+  const r1  = 0.45 + 0.1 * m1;
+  const r2  = 0.45 + 0.1 * m2;
+  const ix1 = -4.5, ix2 = 4.5;
+  const relV = v1 - v2;
+  const tc   = relV > 0 ? (ix2 - ix1 - r1 - r2) / relV : Infinity;
+  const vf   = (m1*v1 + m2*v2) / (m1+m2);
+  const isC  = time >= tc && tc > 0;
+  let labX1, labX2;
+  if (!isC) {
+    labX1 = ix1 + v1*time;
+    labX2 = ix2 + v2*time;
+  } else {
+    const cx1 = ix1 + v1*tc;
+    labX1 = cx1 + vf*(time-tc);
+    labX2 = (cx1 + r1 + r2) + vf*(time-tc);
+  }
+  return { r1, r2, labX1, labX2, vf, isC };
+}
 
-      els.ball1.style.width = `${r1 * 2 * scale}px`;
-      els.ball1.style.height = `${r1 * 2 * scale}px`;
-      els.ball1.style.left = `calc(50% + ${viewX1 * scale - r1 * scale}px)`;
-      els.ball1.style.top = `calc(50% - ${r1 * scale}px)`;
-      els.ball1Text.textContent = `${state.m1}kg`;
-      els.ball1V.textContent = `v' = ${currentV1View.toFixed(2)}`;
+function renderVP(vRef, isLeft, ph) {
+  const { r1, r2, labX1, labX2, vf, isC } = ph;
+  const t  = state.time;
+  const sf = isLeft ? 'l' : 'r';
+  const vx1 = labX1 - vRef*t;
+  const vx2 = labX2 - vRef*t;
+  const cv1 = isC ? vf-vRef : state.v1-vRef;
+  const cv2 = isC ? vf-vRef : state.v2-vRef;
+  const b1 = $('b1'+sf), b2 = $('b2'+sf);
+  const b1V = $('b1'+sf+'-v'), b2V = $('b2'+sf+'-v');
+  const b1T = $('b1'+sf+'-t'), b2T = $('b2'+sf+'-t');
+  const ring = $(isLeft ? 'ring-left' : 'ring-right');
+  const colA = $(isLeft ? 'collided-left' : 'collided-right');
+  const pEl  = $(isLeft ? 'p-left' : 'p-right');
+  const d1 = r1*2*scale, d2 = r2*2*scale;
+  b1.style.width = `${d1}px`; b1.style.height = `${d1}px`;
+  b2.style.width = `${d2}px`; b2.style.height = `${d2}px`;
+  b1.style.left = `calc(50% + ${vx1*scale - r1*scale}px)`;
+  b1.style.top = `calc(${BALL_Y*100}% - ${r1*scale}px)`;
+  b2.style.left = `calc(50% + ${vx2*scale - r2*scale}px)`;
+  b2.style.top = `calc(${BALL_Y*100}% - ${r2*scale}px)`;
+  b1T.textContent = `${state.m1}kg`;
+  b2T.textContent = `${state.m2}kg`;
+  const pr = isLeft ? '' : "'";
+  b1V.textContent = `v${pr}=${cv1.toFixed(2)}`;
+  b2V.textContent = `v${pr}=${cv2.toFixed(2)}`;
+  const gridEl = $(isLeft ? 'grid-left' : 'grid-right');
+  gridEl.style.transform = `translateX(${(-vRef * t * scale) % scale}px)`;
+  scrollScenery(isLeft ? 'scenery-left' : 'scenery-right', -vRef * t * scale);
+  if (isC) {
+    const maxR = Math.max(r1, r2), pad = 18;
+    ring.style.display = 'block';
+    ring.style.width = `${(r1+r2)*2*scale+pad}px`;
+    ring.style.height = `${maxR*2*scale+pad}px`;
+    ring.style.left = `calc(50% + ${vx1*scale - r1*scale - pad/2}px)`;
+    ring.style.top = `calc(${BALL_Y*100}% - ${maxR*scale + pad/2}px)`;
+    colA.style.display = 'inline';
+    b1V.style.opacity = '0';
+    b2V.textContent = `合體 v${pr}=${cv2.toFixed(2)}`;
+  } else {
+    ring.style.display = 'none';
+    colA.style.display = 'none';
+    b1V.style.opacity = '1';
+  }
+  pEl.textContent = (state.m1*cv1 + state.m2*cv2).toFixed(2);
+}
 
-      els.ball2.style.width = `${r2 * 2 * scale}px`;
-      els.ball2.style.height = `${r2 * 2 * scale}px`;
-      els.ball2.style.left = `calc(50% + ${viewX2 * scale - r2 * scale}px)`;
-      els.ball2.style.top = `calc(50% - ${r2 * scale}px)`;
-      els.ball2Text.textContent = `${state.m2}kg`;
-      els.ball2V.textContent = `v' = ${currentV2View.toFixed(2)}`;
+function render() {
+  const ph = physics();
+  renderVP(0, true, ph);
+  renderVP(state.vRef, false, ph);
+  $('time-left').textContent = state.time.toFixed(2);
+  $('time-right').textContent = state.time.toFixed(2);
+  $('vref-display').textContent = state.vRef.toFixed(2);
+  $('vref-badge').textContent = state.vRef.toFixed(2);
+  $('vRef-slider').value = state.vRef;
+}
 
-      const gridOffset = (-state.vRef * state.time) % 1;
-      els.gridContainer.style.transform = `translateX(${gridOffset * scale}px)`;
-
-      if (isCollided) {
-        const maxR = Math.max(r1, r2);
-        const padding = scale === 20 ? 12 : 24;
-        els.collisionRing.style.display = 'block';
-        els.collisionRing.style.width = `${(r1 + r2) * 2 * scale + padding}px`;
-        els.collisionRing.style.height = `${maxR * 2 * scale + padding}px`;
-        els.collisionRing.style.left = `calc(50% + ${viewX1 * scale - r1 * scale - (padding / 2)}px)`;
-        els.collisionRing.style.top = `calc(50% - ${maxR * scale + (padding / 2)}px)`;
-        els.collidedAlert.classList.remove('hidden');
-        els.ball1V.style.opacity = "0";
-        els.ball2V.textContent = `合體 v' = ${currentV2View.toFixed(2)}`;
-      } else {
-        els.collisionRing.style.display = 'none';
-        els.collidedAlert.classList.add('hidden');
-        els.ball1V.style.opacity = "1";
-      }
-
-      els.timeDisplay.textContent = state.time.toFixed(2);
-      els.vRefVal.textContent = state.vRef.toFixed(2);
-      els.dashTotalP.textContent = totalP.toFixed(2);
-      els.vRefSlider.value = state.vRef;
-    }
-
-    let lastTime = performance.now();
-    function loop(currentTime) {
-      if (state.isPlaying) {
-        const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.05);
-        state.time += deltaTime;
-        render();
-      }
-      lastTime = currentTime;
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-
-    function togglePlay() {
-      state.isPlaying = !state.isPlaying;
-      if (state.isPlaying) {
-        lastTime = performance.now();
-        els.btnPlay.classList.replace('bg-emerald-500', 'bg-amber-500');
-        els.iconPlay.classList.add('hidden');
-        els.iconPause.classList.remove('hidden');
-      } else {
-        els.btnPlay.classList.replace('bg-amber-500', 'bg-emerald-500');
-        els.iconPause.classList.add('hidden');
-        els.iconPlay.classList.remove('hidden');
-      }
-    }
-
-    function resetSimulation() {
-      state.time = 0;
-      if (state.isPlaying) togglePlay();
-      render();
-    }
-
-    function handleParamChange(paramName, domValElement) {
-      return (e) => {
-        state[paramName] = Number(e.target.value);
-        if (domValElement) {
-          const unit = paramName.startsWith('m') ? 'kg' : 'm/s';
-          domValElement.textContent = `${state[paramName]} ${unit}`;
-        }
-        state.time = 0;
-        if (state.isPlaying) togglePlay();
-        render();
-      };
-    }
-
-    els.btnPlay.addEventListener('click', togglePlay);
-    els.btnReset.addEventListener('click', resetSimulation);
-    els.m1Slider.addEventListener('input', handleParamChange('m1', els.m1Val));
-    els.v1Slider.addEventListener('input', handleParamChange('v1', els.v1Val));
-    els.m2Slider.addEventListener('input', handleParamChange('m2', els.m2Val));
-    els.v2Slider.addEventListener('input', handleParamChange('v2', els.v2Val));
-    els.vRefSlider.addEventListener('input', (e) => {
-      state.vRef = Number(e.target.value);
-      render();
-    });
-    els.btnResetVref.addEventListener('click', () => {
-      state.vRef = 0;
-      render();
-    });
-    els.btnComFrame.addEventListener('click', () => {
-      const vf = (state.m1 * state.v1 + state.m2 * state.v2) / (state.m1 + state.m2);
-      state.vRef = parseFloat(vf.toFixed(2));
-      render();
-    });
-
+let lastRAF = performance.now();
+(function loop(now) {
+  if (state.isPlaying) {
+    state.time += Math.min((now - lastRAF) / 1000, 0.05);
     render();
-  </script>
-</body>
+  }
+  lastRAF = now;
+  requestAnimationFrame(loop);
+})(performance.now());
 
+function togglePlay() {
+  state.isPlaying = !state.isPlaying;
+  const btn = $('btn-play');
+  if (state.isPlaying) {
+    lastRAF = performance.now();
+    btn.style.background = '#d97706';
+    $('icon-play').style.display = 'none';
+    $('icon-pause').style.display = 'block';
+  } else {
+    btn.style.background = '#10b981';
+    $('icon-pause').style.display = 'none';
+    $('icon-play').style.display = 'block';
+  }
+}
+function resetSim() {
+  state.time = 0;
+  if (state.isPlaying) togglePlay();
+  render();
+}
+
+function paramH(key, el, unit) {
+  return e => {
+    state[key] = Number(e.target.value);
+    el.textContent = `${state[key]} ${unit}`;
+    state.time = 0;
+    if (state.isPlaying) togglePlay();
+    render();
+  };
+}
+
+$('btn-play').addEventListener('click', togglePlay);
+$('btn-reset').addEventListener('click', resetSim);
+$('m1-slider').addEventListener('input', paramH('m1', $('m1-val'), 'kg'));
+$('v1-slider').addEventListener('input', paramH('v1', $('v1-val'), 'm/s'));
+$('m2-slider').addEventListener('input', paramH('m2', $('m2-val'), 'kg'));
+$('v2-slider').addEventListener('input', paramH('v2', $('v2-val'), 'm/s'));
+$('vRef-slider').addEventListener('input', e => { state.vRef = Number(e.target.value); render(); });
+$('btn-reset-vref').addEventListener('click', () => { state.vRef = 0; render(); });
+$('btn-com-frame').addEventListener('click', () => {
+  state.vRef = parseFloat(((state.m1*state.v1 + state.m2*state.v2)/(state.m1+state.m2)).toFixed(2));
+  render();
+});
+
+window.addEventListener('resize', () => { buildGrids(); buildSceneries(); render(); });
+window.addEventListener('load', () => { buildGrids(); buildSceneries(); render(); });
+</script>
+</body>
 </html>
