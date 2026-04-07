@@ -3,92 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shiny的物理教材</title>
+    <title>物理教材入口網站</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* 基礎樣式 */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --btn-gradient: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            --bg-color: #f8f9fa;
+            --text-color: #2d3436;
+        }
+
         body {
-            font-family: 'Arial', 'Microsoft JhengHei', sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
-            padding: 20px;
+            padding: env(safe-area-inset-top) 20px 40px; /* 適配手機安全區域 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            margin-top: 30px;
             text-align: center;
+            width: 100%;
+            max-width: 600px;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
+
         h1 {
-            color: #007bff;
+            font-size: 1.8rem;
+            color: #4834d4;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            font-size: 0.95rem;
+            color: #636e72;
             margin-bottom: 30px;
-            border-bottom: 2px solid #007bff;
-            padding-bottom: 10px;
         }
-        /* 選項清單樣式 */
-        .link-list {
-            list-style: none;
-            padding: 0;
+
+        /* 關鍵：使用 Grid 佈局 */
+        .link-container {
+            display: grid;
+            grid-template-columns: 1fr; /* 手機預設一欄 */
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
         }
-        .link-list li {
-            margin-bottom: 15px;
+
+        /* 當螢幕寬度超過 500px 時轉為雙欄 */
+        @media (min-width: 500px) {
+            .link-container {
+                grid-template-columns: 1fr 1fr;
+            }
         }
-        .link-list a {
-            display: block;
-            padding: 15px 20px;
+
+        .physics-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
             text-decoration: none;
-            color: #fff;
-            background-color: #28a745; /* 綠色按鈕 */
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-            font-size: 1.1em;
-            font-weight: bold;
+            color: white;
+            background: var(--btn-gradient);
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 1.05rem;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 80px;
+            line-height: 1.4;
         }
-        .link-list a:hover {
-            background-color: #218838; /* 懸停時顏色加深 */
+
+        /* 點擊效果：手機上很有感 */
+        .physics-card:active {
+            transform: scale(0.96);
         }
-        /* 註腳樣式 */
+
         footer {
-            margin-top: 40px;
-            font-size: 0.9em;
-            color: #666;
+            margin-top: auto;
+            padding-top: 50px;
+            width: 100%;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        .counter-box {
+            background: white;
+            padding: 10px;
+            border-radius: 30px;
+            display: inline-block;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>高中物理 — 經典主題動畫</h1>
+    <header>
+        <h1>高中物理動畫教材</h1>
+        <p class="subtitle">點擊下方主題開始探索物理原理</p>
+    </header>
 
-        <p>請點擊下方連結：</p>
-
-        <ul class="link-list">
-            <li><a href="wave_aspects.html">波的兩種面向<br/>（一張團照/單點連拍）</a></li>
-
-            <li><a href="centripetal.html">球碰撞多邊形牆感受<br/>向心力指向圓心</a></li>
-        
-            <li><a href="shm.html">簡諧運動是<br/>等速圓周運動投影</a></li>            
-
-            <li><a href="pendulum_vs_shm.html">單擺與簡諧運動週期比較</a></li>
-            
-            </ul>
-    </div>
+    <div id="links" class="link-container"></div>
 
     <footer>
-<!--        <p>&copy; 2024 物理主題中心. 所有內容皆存放在本 Repository 中。</p>  -->
+        <div class="counter-box">
+            <script type='text/javascript' src='https://www.freevisitorcounters.com/auth.php?id=0bdda906befb5100d395394827ef1d1e34e7b433'></script>
+            <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1459286/t/3"></script>
+        </div>
     </footer>
- <a href='http://www.freevisitorcounters.com'>more information</a> 
- <script type='text/javascript' src='https://www.freevisitorcounters.com/auth.php?id=0bdda906befb5100d395394827ef1d1e34e7b433'></script>
- <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1459286/t/3"></script>
 
+    <script>
+        // --- 設定區：未來要新增動畫，只要在下面這個括號 [] 內增加一組資料即可 ---
+        const animations = [
+            { title: "波的兩種面向<br>(團照 / 連拍)", url: "wave_aspects.html" },
+            { title: "向心力<br>(碰撞多邊形)", url: "centripetal.html" },
+            { title: "簡諧運動與<br>圓周運動投影", url: "shm.html" },
+            { title: "單擺與 SHM<br>週期比較", url: "pendulum_vs_shm.html" },
+            // { title: "新動畫名稱", url: "new_animation.html" }, 
+        ];
+
+        const container = document.getElementById('links');
+
+        // 自動生成 HTML 結構
+        animations.forEach(item => {
+            const link = document.createElement('a');
+            link.href = item.url;
+            link.className = 'physics-card';
+            link.innerHTML = item.title;
+            container.appendChild(link);
+        });
+    </script>
 </body>
-
 </html>
-
-
-
-
-
