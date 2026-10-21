@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>單狹縫繞射與惠更斯原理 - 數位黑板教學互動系統</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
+</head>
+
+<body class="dark-board">
+  <!-- 頂部黑板導覽與教學狀態列 -->
+  <header class="blackboard-header">
+    <div class="header-left">
+
+      <h1 class="main-title">惠更斯原理與單狹縫繞射</h1>
+    </div>
+
+    <!-- 頂部即時物理狀態指標 -->
+    <div class="header-metrics">
+      <div class="metric-card" id="metric-condition">
+        <span class="metric-label">第一暗紋條件 (a sinθ = λ)</span>
+        <span class="metric-val" id="val-first-min">θ₁ ≈ 11.5°</span>
+      </div>
+      <div class="metric-card" id="metric-path-diff">
+        <span class="metric-label">當前觀測角光程差 (ΔL = a sinθ)</span>
+        <span class="metric-val" id="val-path-diff">0.00 λ</span>
+      </div>
+      <div class="metric-card highlight-metric" id="metric-status">
+        <span class="metric-label">干涉狀態</span>
+        <span class="metric-val" id="val-interference">中央極大 (完全相長)</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-chalk-mode" class="touch-btn mode-btn" title="切換黑板畫筆標註模式">
+        <span class="icon">✏️</span> 標註
+      </button>
+      <button id="btn-fullscreen" class="touch-btn action-btn" title="切換全螢幕展示">
+        <span class="icon">⛶</span> 全螢幕
+      </button>
+    </div>
+  </header>
+
+  <!-- 主操作舞台 -->
+  <main class="main-stage">
+    <!-- 左側主要舞台 (模擬視圖 + 底部控制面板，控制面板寬度僅延伸至中間區域) -->
+    <div class="left-stage">
+      <!-- 模擬視圖主畫布容器 -->
+      <div class="simulation-container" id="sim-container">
+        <!-- 主波動畫布 -->
+        <canvas id="wave-canvas"></canvas>
+
+        <!-- 黑板畫筆標註層 (老師手寫塗鴉專用) -->
+        <canvas id="drawing-canvas"></canvas>
+
+        <!-- 角度與波前引導懸浮圖層 (去除狹縫開口a標示，視野極簡清爽) -->
+        <div class="overlay-hud" id="overlay-hud">
+
+        </div>
+
+        <!-- 狹縫特寫與縮放觸控工具列 (專為數位黑板放大觀察設計) -->
+        <div class="zoom-toolbar" id="zoom-toolbar">
+          <span class="zoom-toolbar-label">🔍 視角縮放：</span>
+          <button id="btn-zoom-in" class="zoom-btn" title="放大狹縫區域">➕ 放大</button>
+          <button id="btn-zoom-out" class="zoom-btn" title="縮小視角">➖ 縮小</button>
+          <button id="btn-focus-slit" class="zoom-btn highlight-zoom" title="特寫放大觀察狹縫開口處 (2.2x)">🎯 聚焦狹縫特寫</button>
+          <button id="btn-zoom-reset" class="zoom-btn" title="恢復全景視角">↺ 全景</button>
+          <span class="zoom-level-badge" id="zoom-level-text">100%</span>
+        </div>
+
+        <!-- 底部非遮擋式教學重點浮動橫幅 (避開主要波場與光線路徑) -->
+        <div class="bottom-hud-banner" id="bottom-hud-banner" style="display: none;">
+          <span class="banner-badge" id="banner-badge">★ 暗紋相消條件</span>
+          <span class="banner-content" id="banner-text">上半部每一點與下半部距離 a/2 的對應點，光程差皆為 λ/2 (相差半波長，反相 180° 完全相消)！</span>
+        </div>
+
+        <!-- 浮動黑板板書工具列 (當開啟標註時顯示) -->
+        <div class="chalk-toolbar" id="chalk-toolbar" style="display: none;">
+          <span class="toolbar-title">🎨 黑板筆觸：</span>
+          <button class="color-dot active" data-color="#ffea00" style="background: #ffea00;" title="黃色粉筆"></button>
+          <button class="color-dot" data-color="#00f2fe" style="background: #00f2fe;" title="青藍色光線"></button>
+          <button class="color-dot" data-color="#ff007f" style="background: #ff007f;" title="粉紅重點筆"></button>
+          <button class="color-dot" data-color="#ffffff" style="background: #ffffff;" title="白粉筆"></button>
+          <div class="toolbar-sep"></div>
+          <button id="btn-clear-chalk" class="touch-btn mini-btn">🧹 清除板書</button>
+          <button id="btn-close-chalk" class="touch-btn mini-btn close-btn">✕ 結束板書</button>
+        </div>
+      </div>
+
+      <!-- 底部大觸控控制面板 (僅佔左側/中間區域，右下方空間保留給右側分析面板) -->
+      <footer class="blackboard-controls">
+        <!-- 播放控制大按鈕組與視覺圖層開關 (第一列緊湊排布) -->
+        <div class="controls-top-row">
+          <div class="control-group playback-group">
+            <button id="btn-play-pause" class="touch-btn primary-btn" title="播放 / 暫停動畫 (快速鍵：空白鍵 Space)">
+              <span class="btn-icon" id="play-icon">⏸</span>
+              <span class="btn-text" id="play-text">暫停</span>
+            </button>
+            <button id="btn-step-prev" class="touch-btn sub-btn" title="上一波形相位微調 (快速鍵：← 方向鍵)">
+              ⏮
+            </button>
+            <button id="btn-step-next" class="touch-btn sub-btn" title="下一波形相位微調 (快速鍵：→ 方向鍵)">
+              ⏭
+            </button>
+            <button id="btn-reset" class="touch-btn sub-btn" title="波形重設 (快速鍵：R)">
+              ↺
+            </button>
+          </div>
+
+          <!-- 視覺顯示模式切換 -->
+          <div class="control-group view-modes">
+            <span class="group-title">👁 顯示層：</span>
+            <button class="toggle-pill active" id="toggle-wavelets" data-layer="wavelets">
+              <span class="pill-dot"></span> 惠更斯同心子波
+            </button>
+            <button class="toggle-pill active" id="toggle-wavefield" data-layer="wavefield">
+              <span class="pill-dot"></span> 總疊加波場
+            </button>
+            <button class="toggle-pill active" id="toggle-rays" data-layer="rays">
+              <span class="pill-dot"></span> 觀測光線與光程差
+            </button>
+            <button class="toggle-pill active" id="toggle-pairing" data-layer="pairing">
+              <span class="pill-dot"></span> 暗紋配對連線
+            </button>
+            <button class="toggle-pill active" id="toggle-labels" data-layer="labels">
+              <span class="pill-dot"></span> 標示文字
+            </button>
+          </div>
+        </div>
+
+        <!-- 核心參數調節滑桿 (大按鈕、大把手，適合手指觸控) -->
+        <div class="control-group sliders-group">
+          <!-- 狹縫寬度 a -->
+          <div class="slider-item">
+            <div class="slider-header">
+              <label for="slider-a">狹縫寬度 a</label>
+              <span class="slider-val" id="val-a">60 μm</span>
+            </div>
+            <input type="range" id="slider-a" min="20" max="140" step="2" value="60" class="touch-slider">
+          </div>
+
+          <!-- 光波波長 λ -->
+          <div class="slider-item">
+            <div class="slider-header">
+              <label for="slider-lambda">波長 λ</label>
+              <span class="slider-val" id="val-lambda">12 μm</span>
+            </div>
+            <input type="range" id="slider-lambda" min="6" max="24" step="1" value="12" class="touch-slider">
+          </div>
+
+          <!-- 惠更斯子波點源數 N -->
+          <div class="slider-item">
+            <div class="slider-header">
+              <label for="slider-n">子波點源數 N</label>
+              <span class="slider-val" id="val-n">16 個點</span>
+            </div>
+            <input type="range" id="slider-n" min="4" max="32" step="2" value="16" class="touch-slider">
+          </div>
+
+          <!-- 觀測角度 θ -->
+          <div class="slider-item">
+            <div class="slider-header">
+              <label for="slider-theta">觀測角度 θ</label>
+              <span class="slider-val" id="val-theta">0.0°</span>
+            </div>
+            <input type="range" id="slider-theta" min="-35" max="35" step="0.1" value="0" class="touch-slider">
+          </div>
+        </div>
+
+        <!-- 一鍵教學預設情境 (課堂直接點擊切換講課重點) -->
+        <div class="control-group presets-group">
+          <button class="preset-btn" id="preset-center" data-preset="center">
+            1. 中央極大 (θ=0°)
+          </button>
+          <button class="preset-btn" id="preset-min1" data-preset="min1">
+            2. 第一暗紋 (a sinθ = λ)
+          </button>
+          <button class="preset-btn" id="preset-max1" data-preset="max1">
+            3. 第一副極大
+          </button>
+          <button class="preset-btn" id="preset-narrow" data-preset="narrow">
+            4. 狹縫變窄
+          </button>
+          <button class="preset-btn" id="preset-wide" data-preset="wide">
+            5. 狹縫變寬
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 右側屏幕光強與干涉條紋圖 (向下延伸至視窗底部，大幅釋放右下方空間) -->
+    <aside class="screen-panel">
+      <div class="panel-header">
+        <span class="panel-title">觀測屏幕光強分佈 I(θ)</span>
+        <span class="formula-tag">I = I₀ [sin(β)/β]²</span>
+      </div>
+
+      <!-- 屏幕光強強度曲線圖 -->
+      <div class="intensity-chart-wrap">
+        <canvas id="intensity-canvas"></canvas>
+      </div>
+
+      <!-- 自由選點子波疊加示波器 (最多4點自由選取，勾選後疊加顯示) -->
+      <div class="cancellation-scope-wrap" id="scope-wrap">
+        <div class="scope-header">
+          <span class="scope-title">子波疊加示波器</span>
+          <span class="scope-badge" id="scope-badge">選點觀察</span>
+        </div>
+
+        <!-- 4個自由選點控制器 -->
+        <div class="free-points-panel" id="free-points-panel">
+          <div class="free-points-header">
+            <span class="free-points-title">選擇子波點源（最多 4 個，勾選後疊加顯示）</span>
+          </div>
+          <div class="free-points-grid" id="free-points-grid">
+            <!-- 4個點位控制列，由 JS 動態生成 -->
+          </div>
+        </div>
+
+        <canvas id="scope-canvas" height="200"></canvas>
+        <div class="scope-legend" id="scope-legend">
+          <!-- 圖例將由 JS 動態更新 -->
+        </div>
+      </div>
+
+      <!-- 幾何配對分析教學卡片 -->
+      <div class="explanation-card" id="explanation-card">
+        <div class="card-title">&#128161; 自由選點疊加解析</div>
+        <p class="card-desc" id="pairing-text">
+          <strong>&#8226; 選取任意子波點源：</strong>可勾選 1～4 個不同位置的點源，觀察其波形與疊加結果。<br>
+          <strong>&#8226; 光程差決定相位：</strong>兩點間距離 d，到達遠方角度 θ 時，光程差 ΔL = d·sinθ。<br>
+          <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消！<br>
+          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code>，<strong>同相相長</strong>！
+        </p>
+      </div>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
