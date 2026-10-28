@@ -14,55 +14,17 @@
 </head>
 
 <body class="dark-board">
-  <!-- 頂部黑板導覽與教學狀態列 -->
-  <header class="blackboard-header">
-    <div class="header-left">
-
-      <h1 class="main-title">惠更斯原理與單狹縫繞射</h1>
-    </div>
-
-    <!-- 頂部即時物理狀態指標 -->
-    <div class="header-metrics">
-      <div class="metric-card" id="metric-condition">
-        <span class="metric-label">第一暗紋條件 (a sinθ = λ)</span>
-        <span class="metric-val" id="val-first-min">θ₁ ≈ 11.5°</span>
-      </div>
-      <div class="metric-card" id="metric-path-diff">
-        <span class="metric-label">當前觀測角光程差 (ΔL = a sinθ)</span>
-        <span class="metric-val" id="val-path-diff">0.00 λ</span>
-      </div>
-      <div class="metric-card highlight-metric" id="metric-status">
-        <span class="metric-label">干涉狀態</span>
-        <span class="metric-val" id="val-interference">中央極大 (完全相長)</span>
-      </div>
-    </div>
-
-    <div class="header-actions">
-      <button id="btn-chalk-mode" class="touch-btn mode-btn" title="切換黑板畫筆標註模式">
-        <span class="icon">✏️</span> 標註
-      </button>
-      <button id="btn-fullscreen" class="touch-btn action-btn" title="切換全螢幕展示">
-        <span class="icon">⛶</span> 全螢幕
-      </button>
-    </div>
-  </header>
-
-  <!-- 主操作舞台 -->
+  <!-- 主操作舞台 (已移除頂部導覽列與指標，最大化畫布展示空間) -->
   <main class="main-stage">
-    <!-- 左側主要舞台 (模擬視圖 + 底部控制面板，控制面板寬度僅延伸至中間區域) -->
+    <!-- 左側主要舞台 (模擬視圖 + 底部控制面板) -->
     <div class="left-stage">
       <!-- 模擬視圖主畫布容器 -->
       <div class="simulation-container" id="sim-container">
         <!-- 主波動畫布 -->
         <canvas id="wave-canvas"></canvas>
 
-        <!-- 黑板畫筆標註層 (老師手寫塗鴉專用) -->
-        <canvas id="drawing-canvas"></canvas>
-
-        <!-- 角度與波前引導懸浮圖層 (去除狹縫開口a標示，視野極簡清爽) -->
-        <div class="overlay-hud" id="overlay-hud">
-
-        </div>
+        <!-- 角度與波前引導懸浮圖層 -->
+        <div class="overlay-hud" id="overlay-hud"></div>
 
         <!-- 狹縫特寫與縮放觸控工具列 (專為數位黑板放大觀察設計) -->
         <div class="zoom-toolbar" id="zoom-toolbar">
@@ -73,25 +35,16 @@
           <button id="btn-zoom-reset" class="zoom-btn" title="恢復全景視角">↺ 全景</button>
           <span class="zoom-level-badge" id="zoom-level-text">100%</span>
           <span class="toolbar-sep-v"></span>
-          <button id="btn-phasebar-mode" class="zoom-btn phase-mode-btn" title="切換狹縫左側柱狀圖模式：光程差 ΔL ↔ 即時波動位移 cos φ">📊 模式: 光程差 ΔL</button>
+          <button id="btn-phasebar-mode" class="zoom-btn phase-mode-btn" title="切換狹縫左側柱狀圖模式：光程差 ΔL ↔ 即時波動位移 cos φ">📊
+            模式: 光程差 ΔL</button>
+          <span class="toolbar-sep-v"></span>
+          <button id="btn-fullscreen" class="zoom-btn" title="切換全螢幕展示">⛶ 全螢幕</button>
         </div>
 
         <!-- 底部非遮擋式教學重點浮動橫幅 (避開主要波場與光線路徑) -->
         <div class="bottom-hud-banner" id="bottom-hud-banner" style="display: none;">
           <span class="banner-badge" id="banner-badge">★ 暗紋相消條件</span>
           <span class="banner-content" id="banner-text">上半部每一點與下半部距離 a/2 的對應點，光程差皆為 λ/2 (相差半波長，反相 180° 完全相消)！</span>
-        </div>
-
-        <!-- 浮動黑板板書工具列 (當開啟標註時顯示) -->
-        <div class="chalk-toolbar" id="chalk-toolbar" style="display: none;">
-          <span class="toolbar-title">🎨 黑板筆觸：</span>
-          <button class="color-dot active" data-color="#ffea00" style="background: #ffea00;" title="黃色粉筆"></button>
-          <button class="color-dot" data-color="#00f2fe" style="background: #00f2fe;" title="青藍色光線"></button>
-          <button class="color-dot" data-color="#ff007f" style="background: #ff007f;" title="粉紅重點筆"></button>
-          <button class="color-dot" data-color="#ffffff" style="background: #ffffff;" title="白粉筆"></button>
-          <div class="toolbar-sep"></div>
-          <button id="btn-clear-chalk" class="touch-btn mini-btn">🧹 清除板書</button>
-          <button id="btn-close-chalk" class="touch-btn mini-btn close-btn">✕ 結束板書</button>
         </div>
       </div>
 
@@ -117,9 +70,9 @@
 
           <!-- 視覺顯示模式切換 -->
           <div class="control-group view-modes">
-            <span class="group-title">👁 顯示層：</span>
+
             <button class="toggle-pill active" id="toggle-wavelets" data-layer="wavelets">
-              <span class="pill-dot"></span> 惠更斯同心子波
+              <span class="pill-dot"></span> 惠更斯子波
             </button>
             <button class="toggle-pill active" id="toggle-wavefield" data-layer="wavefield">
               <span class="pill-dot"></span> 總疊加波場
@@ -130,8 +83,9 @@
             <button class="toggle-pill active" id="toggle-pairing" data-layer="pairing">
               <span class="pill-dot"></span> 暗紋配對連線
             </button>
-            <button class="toggle-pill active" id="toggle-phasebars" data-layer="phasebars" title="顯示/隱藏狹縫左側各點到達螢幕相位柱狀圖">
-              <span class="pill-dot"></span> 各點相位柱狀圖
+            <button class="toggle-pill active" id="toggle-phasebars" data-layer="phasebars"
+              title="顯示/隱藏狹縫左側各點到達螢幕相位柱狀圖">
+              <span class="pill-dot"></span> 相位柱狀圖
             </button>
             <button class="toggle-pill active" id="toggle-labels" data-layer="labels">
               <span class="pill-dot"></span> 標示文字
@@ -179,7 +133,7 @@
         </div>
 
         <!-- 一鍵教學預設情境 (課堂直接點擊切換講課重點) -->
-        <div class="control-group presets-group">
+        <div class="control-group presets-group" style="display: none;">
           <button class="preset-btn" id="preset-center" data-preset="center">
             1. 中央極大 (θ=0°)
           </button>
@@ -217,7 +171,7 @@
       <!-- 自由選點子波疊加強度分析儀 (最多4點自由選取，顯示疊加光強) -->
       <div class="cancellation-scope-wrap" id="scope-wrap">
         <div class="scope-header">
-          <span class="scope-title">子波疊加強度分析儀</span>
+          <span class="scope-title">在P處之相位疊加分析儀</span>
           <span class="scope-badge" id="scope-badge">選點觀察</span>
         </div>
 
@@ -244,7 +198,8 @@
           <strong>&#8226; 選取任意子波點源：</strong>可勾選 1～4 個不同位置的點源，觀察其疊加光強與相消情況。<br>
           <strong>&#8226; 光程差決定相位：</strong>兩點間距離 d，到達遠方角度 θ 時，光程差 ΔL = d·sinθ。<br>
           <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消（疊加光強為 0）！<br>
-          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code> 同相相長；相距 a/4 的兩點光程差為 <code>λ/2</code> 反相相消！
+          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code> 同相相長；相距 a/4 的兩點光程差為 <code>λ/2</code>
+          反相相消！
         </p>
       </div>
     </aside>

@@ -44,111 +44,6 @@ html, body {
   flex-direction: column;
 }
 
-/* 頂部黑板標頭 */
-.blackboard-header {
-  min-height: 60px;
-  max-height: 72px;
-  height: auto;
-  flex-shrink: 0;
-  background: linear-gradient(180deg, #162238 0%, #0f172a 100%);
-  border-bottom: 2px solid #1e293b;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  z-index: 20;
-  overflow: hidden;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.logo-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 6px 14px;
-  border-radius: 24px;
-}
-
-.chalk-icon {
-  font-size: 1.3rem;
-  color: var(--accent-cyan);
-}
-
-.logo-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: var(--accent-cyan);
-}
-
-.main-title {
-  font-size: clamp(0.85rem, 1.4vw, 1.35rem);
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 頂部即時物理指標卡片 (加大字體，教室後方一目了然) */
-.header-metrics {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 1;
-}
-
-.metric-card {
-  background: var(--bg-card);
-  border: 1.5px solid var(--border-card);
-  border-radius: 10px;
-  padding: 7px 12px;
-  display: flex;
-  flex-direction: column;
-  min-width: 145px;
-  flex-shrink: 1;
-}
-
-.metric-label {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-.metric-val {
-  font-family: var(--font-mono);
-  font-size: 1.18rem;
-  font-weight: 800;
-  color: var(--accent-cyan);
-}
-
-.highlight-metric {
-  border-color: rgba(250, 204, 21, 0.5);
-  background: rgba(250, 204, 21, 0.12);
-}
-.highlight-metric .metric-val {
-  color: var(--accent-yellow);
-}
-
-/* 頂部功能按鈕 */
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
 
 .touch-btn {
   display: inline-flex;
@@ -164,28 +59,6 @@ html, body {
   padding: 10px 18px;
   min-height: 46px;
   transition: all 0.15s ease-out;
-}
-
-.mode-btn {
-  background: rgba(244, 63, 94, 0.15);
-  color: #fda4af;
-  border: 1.5px solid rgba(244, 63, 94, 0.4);
-}
-.mode-btn:hover, .mode-btn.active {
-  background: var(--accent-pink);
-  color: #fff;
-  border-color: var(--accent-pink);
-  box-shadow: 0 0 14px rgba(244, 63, 94, 0.5);
-}
-
-.action-btn {
-  background: #1e293b;
-  color: var(--text-main);
-  border: 1.5px solid var(--border-card);
-}
-.action-btn:hover {
-  background: #334155;
-  border-color: #64748b;
 }
 
 /* 主操作舞台 (左側舞台 + 右側屏幕) */
@@ -219,22 +92,13 @@ html, body {
   cursor: grabbing;
 }
 
-#wave-canvas, #drawing-canvas {
+#wave-canvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   display: block;
-}
-
-#drawing-canvas {
-  pointer-events: none;
-  z-index: 10;
-}
-#drawing-canvas.drawing-active {
-  pointer-events: auto;
-  cursor: crosshair;
 }
 
 /* 浮動 HUD 標籤 (加大字體) */
@@ -311,7 +175,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 1rem;
   font-weight: 800;
-  color: var(--accent-yellow);
+  color: #38bdf8;
   min-width: 52px;
   text-align: center;
 }
@@ -322,13 +186,13 @@ html, body {
   margin: 0 4px;
 }
 .phase-mode-btn {
-  background: rgba(250, 204, 21, 0.15);
-  color: var(--accent-yellow);
-  border-color: rgba(250, 204, 21, 0.4);
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
 }
 .phase-mode-btn:hover {
-  background: rgba(250, 204, 21, 0.3);
-  border-color: var(--accent-yellow);
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
 }
 
 /* 底部非遮擋式教學浮動橫幅 */
@@ -369,64 +233,7 @@ html, body {
   line-height: 1.45;
 }
 
-/* 黑板塗鴉工具列 */
-.chalk-toolbar {
-  position: absolute;
-  top: 66px;
-  right: 18px;
-  z-index: 25;
-  background: rgba(15, 23, 42, 0.94);
-  border: 2px solid var(--accent-pink);
-  border-radius: 14px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
-}
 
-.toolbar-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #fff;
-}
-
-.color-dot {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-.color-dot.active {
-  transform: scale(1.22);
-  border-color: #ffffff;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-}
-
-.toolbar-sep {
-  width: 1px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.mini-btn {
-  padding: 6px 12px;
-  font-size: 0.9rem;
-  min-height: 36px;
-  background: #334155;
-  color: #fff;
-}
-.mini-btn:hover {
-  background: #475569;
-}
-.close-btn {
-  background: rgba(244, 63, 94, 0.2);
-  color: #fda4af;
-  border: 1px solid rgba(244, 63, 94, 0.5);
-}
 
 /* 右側屏幕光強面板 (延伸至視窗底部，大幅釋放右下方空間) */
 .screen-panel {
@@ -679,7 +486,7 @@ html, body {
 .card-title {
   font-size: 0.98rem;
   font-weight: 800;
-  color: var(--accent-yellow);
+  color: #38bdf8;
   margin-bottom: 8px;
 }
 
@@ -689,16 +496,16 @@ html, body {
 }
 
 .card-desc strong {
-  color: var(--accent-cyan);
+  color: #7dd3fc;
 }
 
 .card-desc code {
   font-family: var(--font-mono);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(56, 189, 248, 0.12);
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 700;
-  color: #fef08a;
+  color: #bae6fd;
 }
 
 /* ⇒ 箭頭符號 (保證在所有字型下顯示清晰) */
@@ -706,7 +513,7 @@ html, body {
   font-family: 'JetBrains Mono', 'Noto Sans TC', Arial, sans-serif;
   font-size: 1.05rem;
   font-weight: 900;
-  color: var(--accent-yellow);
+  color: #38bdf8;
   margin: 0 2px;
 }
 
@@ -761,8 +568,8 @@ html, body {
   transform: translateY(-1px);
 }
 .primary-btn.paused {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
 }
 
 .sub-btn {
@@ -846,7 +653,7 @@ html, body {
   font-family: var(--font-mono);
   font-size: 1.15rem;
   font-weight: 800;
-  color: var(--accent-yellow);
+  color: #38bdf8;
 }
 
 .touch-slider {
@@ -902,9 +709,9 @@ html, body {
 }
 
 .preset-btn.active {
-  background: rgba(250, 204, 21, 0.15);
-  border-color: var(--accent-yellow);
-  color: var(--accent-yellow);
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
   font-weight: 700;
 }
 
@@ -919,11 +726,6 @@ html, body {
 }
 
 @media (max-width: 900px) {
-  .blackboard-header {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-  }
   .main-stage {
     flex-direction: column;
     overflow-y: auto;

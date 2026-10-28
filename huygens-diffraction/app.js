@@ -68,7 +68,7 @@ const state = {
 const waveCanvas = document.getElementById('wave-canvas');
 const waveCtx = waveCanvas.getContext('2d');
 const drawingCanvas = document.getElementById('drawing-canvas');
-const drawingCtx = drawingCanvas.getContext('2d');
+const drawingCtx = drawingCanvas ? drawingCanvas.getContext('2d') : null;
 const intensityCanvas = document.getElementById('intensity-canvas');
 const intensityCtx = intensityCanvas.getContext('2d');
 const scopeCanvas = document.getElementById('scope-canvas');
@@ -139,17 +139,19 @@ function resizeCanvases() {
   waveCanvas.height = rect.height * dpr;
   waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  // 保持手繪畫布內容
-  const tempDraw = document.createElement('canvas');
-  tempDraw.width = drawingCanvas.width;
-  tempDraw.height = drawingCanvas.height;
-  const tempCtx = tempDraw.getContext('2d');
-  tempCtx.drawImage(drawingCanvas, 0, 0);
+  // 保持手繪畫布內容 (若存在)
+  if (drawingCanvas && drawingCtx) {
+    const tempDraw = document.createElement('canvas');
+    tempDraw.width = drawingCanvas.width;
+    tempDraw.height = drawingCanvas.height;
+    const tempCtx = tempDraw.getContext('2d');
+    tempCtx.drawImage(drawingCanvas, 0, 0);
 
-  drawingCanvas.width = rect.width * dpr;
-  drawingCanvas.height = rect.height * dpr;
-  drawingCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  drawingCtx.drawImage(tempDraw, 0, 0, rect.width, rect.height);
+    drawingCanvas.width = rect.width * dpr;
+    drawingCanvas.height = rect.height * dpr;
+    drawingCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawingCtx.drawImage(tempDraw, 0, 0, rect.width, rect.height);
+  }
 
   // 右側光強畫布
   const intRect = intensityCanvas.parentElement.getBoundingClientRect();
@@ -1061,8 +1063,8 @@ function drawPhaseBarChart(geom, w, h) {
 
   const topBarY = sources[0].y;
   const botBarY = sources[N - 1].y;
-  const padTop = 28;
-  const padBot = 22;
+  const padTop = 44; // 充足的外框留白，拉開標題與第一根柱條的距離
+  const padBot = 24;
   const boxTop = topBarY - padTop;
   const boxBottom = botBarY + padBot;
   const totalBoxH = boxBottom - boxTop;
@@ -1089,22 +1091,22 @@ function drawPhaseBarChart(geom, w, h) {
   waveCtx.stroke();
   waveCtx.shadowBlur = 0;
 
-  // 2. 標題與模式徽章 (精簡標題，確保永不溢出框線)
+  // 2. 標題與模式徽章 (精簡標題，舒適留白)
   waveCtx.fillStyle = '#38bdf8';
   waveCtx.font = 'bold 11px "Noto Sans TC", "JetBrains Mono", sans-serif';
   waveCtx.textAlign = 'left';
   waveCtx.textBaseline = 'middle';
-  const modeTitle = state.phaseBarMode === 'diff' ? '在P處各點光程差\n\n\n' : '在P處各點電場';
+  const modeTitle = state.phaseBarMode === 'diff' ? '在P處各點光程差' : '在P處各點電場';
   waveCtx.fillText(modeTitle, boxLeft + 8, boxTop + 14);
 
   // 模式微標籤
   waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
-  waveCtx.fillStyle = 'rgba(250, 204, 21, 0.9)';
+  waveCtx.fillStyle = 'rgba(56, 189, 248, 0.9)';
   waveCtx.textAlign = 'right';
   const modeBadgeText = state.phaseBarMode === 'diff' ? 'ΔL' : 'cos φ';
   waveCtx.fillText(modeBadgeText, boxLeft + totalBoxW - 8, boxTop + 14);
 
-  // 3. 繪製刻度垂直參考線與標籤
+  // 3. 繪製刻度垂直參考線與標籤 (距離第一根柱條 15px 舒適間隔)
   const isDiffMode = (state.phaseBarMode === 'diff');
 
   if (isDiffMode) {
@@ -1119,7 +1121,7 @@ function drawPhaseBarChart(geom, w, h) {
     waveCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
     waveCtx.textAlign = 'center';
-    waveCtx.fillText('0', chartLeft, boxTop + 24);
+    waveCtx.fillText('0', chartLeft, boxTop + 29);
 
     // λ/2 (180° 相消參考線 - 粉紅虛線)
     const xHalf = chartLeft + 0.5 * pxPerLambda;
@@ -1134,7 +1136,7 @@ function drawPhaseBarChart(geom, w, h) {
       waveCtx.setLineDash([]);
 
       waveCtx.fillStyle = '#fda4af';
-      waveCtx.fillText('λ/2', xHalf, boxTop + 24);
+      waveCtx.fillText('λ/2', xHalf, boxTop + 29);
     }
 
     // 1.0λ (360° 參考線 - 青藍虛線)
@@ -1150,7 +1152,7 @@ function drawPhaseBarChart(geom, w, h) {
       waveCtx.setLineDash([]);
 
       waveCtx.fillStyle = '#38bdf8';
-      waveCtx.fillText('1λ', xOne, boxTop + 24);
+      waveCtx.fillText('1λ', xOne, boxTop + 29);
     }
 
     // 2.0λ (若刻度支援)
@@ -1167,7 +1169,7 @@ function drawPhaseBarChart(geom, w, h) {
         waveCtx.setLineDash([]);
 
         waveCtx.fillStyle = '#facc15';
-        waveCtx.fillText('2λ', Math.min(xTwo, chartRight - 6), boxTop + 24);
+        waveCtx.fillText('2λ', Math.min(xTwo, chartRight - 6), boxTop + 29);
       }
     }
   } else {
@@ -1186,11 +1188,11 @@ function drawPhaseBarChart(geom, w, h) {
     waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
     waveCtx.textAlign = 'center';
     waveCtx.fillStyle = '#fda4af';
-    waveCtx.fillText('-1', chartLeft + 6, boxTop + 24);
+    waveCtx.fillText('-1', chartLeft + 6, boxTop + 29);
     waveCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    waveCtx.fillText('0', chartMidX, boxTop + 24);
+    waveCtx.fillText('0', chartMidX, boxTop + 29);
     waveCtx.fillStyle = '#38bdf8';
-    waveCtx.fillText('+1', chartRight - 6, boxTop + 24);
+    waveCtx.fillText('+1', chartRight - 6, boxTop + 29);
   }
 
   // 4. 連接導引虛線：從柱狀圖右側延伸連到狹縫各波源點
@@ -1973,38 +1975,44 @@ function updateMetrics() {
 
   // 第一暗紋計算 a sinθ = λ
   const sinMin1 = wl / a;
-  if (sinMin1 <= 1) {
-    const thetaMin1 = (Math.asin(sinMin1) * 180 / Math.PI).toFixed(1);
-    valFirstMin.textContent = `θ₁ ≈ ±${thetaMin1}°`;
-  } else {
-    valFirstMin.textContent = '不存在 (a < λ)';
+  if (valFirstMin) {
+    if (sinMin1 <= 1) {
+      const thetaMin1 = (Math.asin(sinMin1) * 180 / Math.PI).toFixed(1);
+      valFirstMin.textContent = `θ₁ ≈ ±${thetaMin1}°`;
+    } else {
+      valFirstMin.textContent = '不存在 (a < λ)';
+    }
   }
 
   // 光程差 ΔL = a sinθ
   const pathDiff = (a * sinT).toFixed(1);
   const pathDiffLambda = ((a * sinT) / wl).toFixed(2);
-  valPathDiff.textContent = `${pathDiffLambda} λ (${pathDiff} μm)`;
+  if (valPathDiff) {
+    valPathDiff.textContent = `${pathDiffLambda} λ (${pathDiff} μm)`;
+  }
 
   // 當前干涉狀態判定
   const beta = (Math.PI * a / wl) * sinT;
   let curI = 1.0;
   if (Math.abs(beta) > 1e-5) curI = Math.pow(Math.sin(beta) / beta, 2);
 
-  if (Math.abs(thetaDeg) < 0.8) {
-    valInterference.textContent = '中央極大 (完全相長)';
-    valInterference.style.color = 'var(--accent-yellow)';
-  } else if (Math.abs(Math.abs(a * sinT) - wl) < wl * 0.1) {
-    valInterference.textContent = '第一暗紋 (完全相消 0%)';
-    valInterference.style.color = 'var(--accent-pink)';
-  } else if (Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.1) {
-    valInterference.textContent = '第二暗紋 (完全相消 0%)';
-    valInterference.style.color = 'var(--accent-pink)';
-  } else if (Math.abs(Math.abs(a * sinT) - 1.43 * wl) < wl * 0.12) {
-    valInterference.textContent = `第一副極大 (~4.7%)`;
-    valInterference.style.color = 'var(--accent-cyan)';
-  } else {
-    valInterference.textContent = `部分干涉 (I ≈ ${(curI * 100).toFixed(1)}%)`;
-    valInterference.style.color = 'var(--text-main)';
+  if (valInterference) {
+    if (Math.abs(thetaDeg) < 0.8) {
+      valInterference.textContent = '中央極大 (完全相長)';
+      valInterference.style.color = 'var(--accent-cyan)';
+    } else if (Math.abs(Math.abs(a * sinT) - wl) < wl * 0.1) {
+      valInterference.textContent = '第一暗紋 (完全相消 0%)';
+      valInterference.style.color = 'var(--accent-pink)';
+    } else if (Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.1) {
+      valInterference.textContent = '第二暗紋 (完全相消 0%)';
+      valInterference.style.color = 'var(--accent-pink)';
+    } else if (Math.abs(Math.abs(a * sinT) - 1.43 * wl) < wl * 0.12) {
+      valInterference.textContent = `第一副極大 (~4.7%)`;
+      valInterference.style.color = 'var(--accent-cyan)';
+    } else {
+      valInterference.textContent = `部分干涉 (I ≈ ${(curI * 100).toFixed(1)}%)`;
+      valInterference.style.color = 'var(--text-main)';
+    }
   }
 
   // 同步更新底部 HUD 相消教學橫幅 (第一暗紋 a/2 配對與第二暗紋 a/4 配對)
@@ -2159,7 +2167,7 @@ function initEvents() {
         btnPhasebarMode.textContent = '📊 模式: 光程差 ΔL';
         btnPhasebarMode.title = '當前：光程差與相對相位。點擊切換為即時波動位移 cos φ';
       } else {
-        btnPhasebarMode.textContent = '🌊 模式: 即時位移 cos';
+        btnPhasebarMode.textContent = '🌊 模式: 即時電場 cos';
         btnPhasebarMode.title = '當前：即時波動位移。點擊切換為光程差與相對相位 ΔL';
       }
     });
@@ -2456,79 +2464,83 @@ function initEvents() {
     }, { passive: false });
   });
 
-  // 10. 黑板板書標註模式 (Chalk Pen)
-  btnChalkMode.addEventListener('click', toggleChalkMode);
-  btnCloseChalk.addEventListener('click', toggleChalkMode);
+  // 10. 黑板板書標註模式 (Chalk Pen) - 已於介面精簡移除，保留安全守護
+  if (btnChalkMode && drawingCanvas && drawingCtx) {
+    btnChalkMode.addEventListener('click', toggleChalkMode);
+    if (btnCloseChalk) btnCloseChalk.addEventListener('click', toggleChalkMode);
 
-  function toggleChalkMode() {
-    state.chalkMode = !state.chalkMode;
-    btnChalkMode.classList.toggle('active', state.chalkMode);
-    chalkToolbar.style.display = state.chalkMode ? 'flex' : 'none';
-    drawingCanvas.classList.toggle('drawing-active', state.chalkMode);
-  }
+    function toggleChalkMode() {
+      state.chalkMode = !state.chalkMode;
+      btnChalkMode.classList.toggle('active', state.chalkMode);
+      if (chalkToolbar) chalkToolbar.style.display = state.chalkMode ? 'flex' : 'none';
+      drawingCanvas.classList.toggle('drawing-active', state.chalkMode);
+    }
 
-  document.querySelectorAll('.color-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-      dot.classList.add('active');
-      state.chalkColor = dot.dataset.color;
+    document.querySelectorAll('.color-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+        state.chalkColor = dot.dataset.color;
+      });
     });
-  });
 
-  btnClearChalk.addEventListener('click', () => {
-    drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-  });
+    if (btnClearChalk) {
+      btnClearChalk.addEventListener('click', () => {
+        drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+      });
+    }
 
-  function startDraw(e) {
-    if (!state.chalkMode) return;
-    state.isDrawing = true;
-    const rect = drawingCanvas.getBoundingClientRect();
-    const cx = e.clientX || (e.touches && e.touches[0].clientX);
-    const cy = e.clientY || (e.touches && e.touches[0].clientY);
-    state.lastX = cx - rect.left;
-    state.lastY = cy - rect.top;
+    function startDraw(e) {
+      if (!state.chalkMode) return;
+      state.isDrawing = true;
+      const rect = drawingCanvas.getBoundingClientRect();
+      const cx = e.clientX || (e.touches && e.touches[0].clientX);
+      const cy = e.clientY || (e.touches && e.touches[0].clientY);
+      state.lastX = cx - rect.left;
+      state.lastY = cy - rect.top;
+    }
+
+    function drawMove(e) {
+      if (!state.chalkMode || !state.isDrawing) return;
+      const rect = drawingCanvas.getBoundingClientRect();
+      const cx = e.clientX || (e.touches && e.touches[0].clientX);
+      const cy = e.clientY || (e.touches && e.touches[0].clientY);
+      const curX = cx - rect.left;
+      const curY = cy - rect.top;
+
+      drawingCtx.save();
+      drawingCtx.strokeStyle = state.chalkColor;
+      drawingCtx.lineWidth = 3.8;
+      drawingCtx.lineCap = 'round';
+      drawingCtx.lineJoin = 'round';
+      drawingCtx.shadowColor = state.chalkColor;
+      drawingCtx.shadowBlur = 5;
+
+      drawingCtx.beginPath();
+      drawingCtx.moveTo(state.lastX, state.lastY);
+      drawingCtx.lineTo(curX, curY);
+      drawingCtx.stroke();
+      drawingCtx.restore();
+
+      state.lastX = curX;
+      state.lastY = curY;
+    }
+
+    function stopDraw() {
+      state.isDrawing = false;
+    }
+
+    drawingCanvas.addEventListener('mousedown', startDraw);
+    drawingCanvas.addEventListener('mousemove', drawMove);
+    window.addEventListener('mouseup', stopDraw);
+
+    drawingCanvas.addEventListener('touchstart', startDraw, { passive: false });
+    drawingCanvas.addEventListener('touchmove', (e) => {
+      if (state.chalkMode) e.preventDefault();
+      drawMove(e);
+    }, { passive: false });
+    window.addEventListener('touchend', stopDraw);
   }
-
-  function drawMove(e) {
-    if (!state.chalkMode || !state.isDrawing) return;
-    const rect = drawingCanvas.getBoundingClientRect();
-    const cx = e.clientX || (e.touches && e.touches[0].clientX);
-    const cy = e.clientY || (e.touches && e.touches[0].clientY);
-    const curX = cx - rect.left;
-    const curY = cy - rect.top;
-
-    drawingCtx.save();
-    drawingCtx.strokeStyle = state.chalkColor;
-    drawingCtx.lineWidth = 3.8;
-    drawingCtx.lineCap = 'round';
-    drawingCtx.lineJoin = 'round';
-    drawingCtx.shadowColor = state.chalkColor;
-    drawingCtx.shadowBlur = 5;
-
-    drawingCtx.beginPath();
-    drawingCtx.moveTo(state.lastX, state.lastY);
-    drawingCtx.lineTo(curX, curY);
-    drawingCtx.stroke();
-    drawingCtx.restore();
-
-    state.lastX = curX;
-    state.lastY = curY;
-  }
-
-  function stopDraw() {
-    state.isDrawing = false;
-  }
-
-  drawingCanvas.addEventListener('mousedown', startDraw);
-  drawingCanvas.addEventListener('mousemove', drawMove);
-  window.addEventListener('mouseup', stopDraw);
-
-  drawingCanvas.addEventListener('touchstart', startDraw, { passive: false });
-  drawingCanvas.addEventListener('touchmove', (e) => {
-    if (state.chalkMode) e.preventDefault();
-    drawMove(e);
-  }, { passive: false });
-  window.addEventListener('touchend', stopDraw);
 
   // 初始化完成
 }
