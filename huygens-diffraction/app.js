@@ -20,20 +20,25 @@ const state = {
   wavelength: 12,      // λ: 波長 (像素/微米)
   numSources: 16,      // N: 惠更斯子波源數量
   thetaDeg: 0,         // θ: 觀測角度 (度)
-  
+
   // 模擬動態控制
   isPlaying: true,
   wavePhase: 0,        // 當前相位 φ(t)
   waveSpeed: 0.18,     // 相位推進速度 rad/frame
-  
+
   // 視覺圖層開關
   layers: {
     wavelets: true,    // 惠更斯同心子波圓環
     wavefield: true,   // 連續疊加波場
     rays: true,        // 觀測光線與光程差
     pairing: true,     // 暗紋配對輔助連線
+    phasebars: true,   // 狹縫左側各點到達螢幕相位柱狀圖
     labels: true       // 所有標示文字徽章
   },
+
+  // 柱狀圖模式: 'diff' (光程差/相對相位 ΔL/λ) | 'wave' (即時波動位移 cos φ)
+  phaseBarMode: 'diff',
+  hoveredBarIdx: -1,   // 滑鼠懸停柱狀圖條索引
 
   // 視角縮放與平移 (Zoom & Pan)
   zoom: 1.0,           // 縮放倍率 (0.7x ~ 3.5x)
@@ -45,10 +50,10 @@ const state = {
 
   // 自由選點: 4 個槽位，每個槽位可勾選啟用並自由選擇點源索引
   freePoints: [
-    { enabled: true,  idx: 0,  color: '#00f2fe', label: '點 A' },
-    { enabled: true,  idx: 8,  color: '#fb923c', label: '點 B' },
-    { enabled: false, idx: 4,  color: '#4ade80', label: '點 C' },
-    { enabled: false, idx: 12, color: '#f43f5e', label: '點 D' },
+    { enabled: true, idx: 0, color: '#ea00ffff', label: '點 A' },
+    { enabled: true, idx: 8, color: '#fb923c', label: '點 B' },
+    { enabled: false, idx: 4, color: '#4ade80', label: '點 C' },
+    { enabled: false, idx: 12, color: '#c084fc', label: '點 D' },
   ],
 
   // 黑板畫筆標註狀態
@@ -84,6 +89,7 @@ const btnZoomOut = document.getElementById('btn-zoom-out');
 const btnFocusSlit = document.getElementById('btn-focus-slit');
 const btnZoomReset = document.getElementById('btn-zoom-reset');
 const zoomLevelText = document.getElementById('zoom-level-text');
+const btnPhasebarMode = document.getElementById('btn-phasebar-mode');
 
 // 底部浮動橫幅 DOM
 const bottomHudBanner = document.getElementById('bottom-hud-banner');
@@ -128,7 +134,7 @@ let bufferImageData = bufferCtx.createImageData(BUFFER_W, BUFFER_H);
 function resizeCanvases() {
   const rect = simContainer.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  
+
   waveCanvas.width = rect.width * dpr;
   waveCanvas.height = rect.height * dpr;
   waveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -156,7 +162,7 @@ function resizeCanvases() {
     const scopeRect = scopeCanvas.parentElement.getBoundingClientRect();
     const targetW = Math.max(120, scopeRect.width - 28);
     scopeCanvas.width = targetW * dpr;
-    scopeCanvas.height = 200 * dpr;
+    scopeCanvas.height = 135 * dpr;
     scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }
@@ -229,7 +235,7 @@ function getSlitGeometry(w, h) {
   const halfA = state.slitWidth * 0.5;
   const slitTop = centerY - halfA;
   const slitBottom = centerY + halfA;
-  
+
   // 計算 N 個惠更斯子波點源位置
   const sources = [];
   const N = state.numSources;
@@ -237,9 +243,9 @@ function getSlitGeometry(w, h) {
     const y = slitTop + (state.slitWidth / N) * (i + 0.5);
     sources.push({ x: slitX, y: y, index: i });
   }
-  
+
   const halfN = Math.floor(N / 2);
-  
+
   // 示範配對 1: 頂端點 (0) ↔ 中間對應點 (halfN)，內部間距 a/2
   const pair1 = {
     top: sources[0],
@@ -436,6 +442,11 @@ function drawWaveScene() {
   // 5. 繪製不透明遮光擋板 (Slit Wall)
   drawSlitBarrier(geom, w, h);
 
+  // 5.5 繪製狹縫左方各點到達螢幕相位柱狀圖 (在擋板之後繪製，確保永不被擋板壓在下面)
+  if (state.layers.phasebars) {
+    drawPhaseBarChart(geom, w, h);
+  }
+
   // 6. 繪製惠更斯點波源 (清晰避碰徽章，勾選點標示 A、B、C、D)
   drawHuygensSources(geom);
 
@@ -454,8 +465,8 @@ function buildFreePointsUI() {
   if (!grid) return;
   grid.innerHTML = '';
   const N = state.numSources;
-  const COLORS = ['#00f2fe', '#fb923c', '#4ade80', '#f43f5e'];
-  state.freePoints.forEach(function(fp, slotIdx) {
+  const COLORS = ['#ea00ffff', '#fb923c', '#4ade80', '#c084fc'];
+  state.freePoints.forEach(function (fp, slotIdx) {
     fp.color = COLORS[slotIdx];
     fp.idx = Math.max(0, Math.min(N - 1, fp.idx));
 
@@ -470,7 +481,7 @@ function buildFreePointsUI() {
     cb.className = 'fp-checkbox';
     cb.checked = fp.enabled;
     cb.style.accentColor = fp.color;
-    cb.addEventListener('change', function() {
+    cb.addEventListener('change', function () {
       fp.enabled = cb.checked;
       row.classList.toggle('fp-enabled', fp.enabled);
       renderSuperpositionScope();
@@ -500,7 +511,7 @@ function buildFreePointsUI() {
     valSpan.style.color = fp.color;
     valSpan.textContent = '#' + fp.idx;
 
-    const onSliderChange = function() {
+    const onSliderChange = function () {
       fp.idx = parseInt(slider.value, 10);
       valSpan.textContent = '#' + fp.idx;
       renderSuperpositionScope();
@@ -520,7 +531,7 @@ function buildFreePointsUI() {
 
 function updateFreePointsSliderMax() {
   const N = state.numSources;
-  state.freePoints.forEach(function(fp) {
+  state.freePoints.forEach(function (fp) {
     fp.idx = Math.max(0, Math.min(N - 1, fp.idx));
   });
   buildFreePointsUI();
@@ -582,7 +593,7 @@ function drawHuygensSources(geom) {
     const ly = fromY;
     waveCtx.save();
     waveCtx.shadowBlur = 0;
-    
+
     // 1. 引線 (從點源往左拉到標籤)
     waveCtx.strokeStyle = lineColor;
     waveCtx.lineWidth = 1.6;
@@ -612,7 +623,7 @@ function drawHuygensSources(geom) {
     waveCtx.textAlign = 'center';
     waveCtx.textBaseline = 'middle';
     waveCtx.fillText(label, col + badgeW * 0.5, ly);
-    
+
     waveCtx.restore();
   }
 
@@ -653,8 +664,8 @@ function drawHuygensSources(geom) {
       waveCtx.shadowBlur = 0;
       waveCtx.fill();
 
-      // 4. 勾選點呼出標籤 (A, B, C, D) 標註於狹縫左側
-      if (state.layers.labels) {
+      // 4. 勾選點呼出標籤 (A, B, C, D) 標註於狹縫左側 (若相位柱狀圖開啟，則直接整合於柱狀圖內以避免重疊)
+      if (state.layers.labels && !state.layers.phasebars) {
         const col = geom.slitX - 52 - (slotIdx % 2) * 40;
         drawLeftCallout(src.x, src.y, col, label, dotColor, dotColor, 32);
       }
@@ -695,7 +706,7 @@ function drawRaysAndPathDiff(geom, w, h) {
   const rayLen = Math.min(w * 0.65, 480);
 
   waveCtx.save();
-  
+
   // 0. 水平中央基準軸線 (θ = 0° 光軸基準線，以便一眼看清觀測角 θ 所夾角度)
   const axisLen = Math.min(w * 0.72, 540);
   waveCtx.save();
@@ -990,16 +1001,466 @@ function drawPairingLines(geom) {
   waveCtx.restore();
 }
 
-function updateBottomBanner(isNearMin1) {
+/**
+ * 繪製狹縫左方各點到達螢幕相位柱狀圖 (橫向柱狀圖)
+ * 直觀呈現各子波點源到達遠方屏幕時的相位與光程差，以及對應點間反相相消 (Δφ = 180° / ΔL = λ/2) 的可能性
+ */
+function drawPhaseBarChart(geom, w, h) {
+  if (!state.layers.phasebars) return;
+  const sources = geom.sources;
+  const N = sources.length;
+  if (N === 0) return;
+
+  const thetaRad = (state.thetaDeg * Math.PI) / 180;
+  const sinT = Math.sin(thetaRad);
+  const absSinT = Math.abs(sinT);
+  const k = (2 * Math.PI) / state.wavelength;
+
+  const topY = sources[0].y;
+  const botY = sources[N - 1].y;
+
+  // 計算每一點到達遠方螢幕時相對於領先波前的額外光程差 (ΔL_i >= 0) 與相位
+  // 當 θ >= 0 時 (光線朝右下射出)，底端點最靠近螢幕 (領先，ΔL = 0)，頂端點需多走 a·sinθ 光程
+  // 當 θ < 0 時 (光線朝右上射出)，頂端點最靠近螢幕 (領先，ΔL = 0)，底端點需多走 a·|sinθ| 光程
+  const pointData = sources.map((src, idx) => {
+    let extraPath = 0;
+    if (thetaRad >= 0) {
+      extraPath = (botY - src.y) * sinT;
+    } else {
+      extraPath = (src.y - topY) * absSinT;
+    }
+    const pathLambda = extraPath / state.wavelength; // ΔL / λ
+    const phaseOffset = k * extraPath;               // 相位 φ (rad)
+    const phaseCycle = (pathLambda % 1 + 1) % 1;    // 0 ~ 1 循環相位
+    const phaseDeg = (pathLambda * 360) % 360;      // 0 ~ 360°
+    return {
+      idx,
+      src,
+      extraPath,
+      pathLambda,
+      phaseOffset,
+      phaseCycle,
+      phaseDeg
+    };
+  });
+
+  // 整理自由選點中被勾選的槽位 (A, B, C, D)
+  const enabledMap = new Map();
+  state.freePoints.forEach((fp, slotIdx) => {
+    if (fp.enabled) {
+      const clampedIdx = Math.max(0, Math.min(N - 1, fp.idx));
+      enabledMap.set(clampedIdx, { fp, slotIdx });
+    }
+  });
+
+  // 柱狀圖尺寸與定位
+  const slitX = geom.slitX;
+  const chartRight = slitX - 24; // 與狹縫間距保持 24px 安全距離
+  const chartW = Math.min(115, Math.max(76, slitX * 0.48));
+  const chartLeft = chartRight - chartW;
+
+  const topBarY = sources[0].y;
+  const botBarY = sources[N - 1].y;
+  const padTop = 28;
+  const padBot = 22;
+  const boxTop = topBarY - padTop;
+  const boxBottom = botBarY + padBot;
+  const totalBoxH = boxBottom - boxTop;
+  const boxLeft = chartLeft - 16;
+  const totalBoxW = chartW + 28;
+  // 右邊緣 boxLeft + totalBoxW = chartRight + 12 = slitX - 12 (與狹縫邊緣 slitX - 7 保留 5px 安全間隙)
+
+  // 動態刻度：決定 chartW 代表的波長倍數 (至少 1.2λ，確保中央極大與第一暗紋清晰展開)
+  const maxPathLambda = (state.slitWidth * absSinT) / state.wavelength;
+  const scaleMaxLambda = Math.max(1.2, Math.ceil(maxPathLambda * 1.15 * 2) / 2);
+  const pxPerLambda = chartW / scaleMaxLambda;
+
+  waveCtx.save();
+
+  // 1. 繪製半透明深色玻璃擬態外框
+  waveCtx.fillStyle = 'rgba(10, 16, 30, 0.94)';
+  waveCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+  waveCtx.lineWidth = 1.5;
+  waveCtx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+  waveCtx.shadowBlur = 10;
+  waveCtx.beginPath();
+  waveCtx.roundRect(boxLeft, boxTop, totalBoxW, totalBoxH, 10);
+  waveCtx.fill();
+  waveCtx.stroke();
+  waveCtx.shadowBlur = 0;
+
+  // 2. 標題與模式徽章 (精簡標題，確保永不溢出框線)
+  waveCtx.fillStyle = '#38bdf8';
+  waveCtx.font = 'bold 11px "Noto Sans TC", "JetBrains Mono", sans-serif';
+  waveCtx.textAlign = 'left';
+  waveCtx.textBaseline = 'middle';
+  const modeTitle = state.phaseBarMode === 'diff' ? '在P處各點光程差\n\n\n' : '在P處各點電場';
+  waveCtx.fillText(modeTitle, boxLeft + 8, boxTop + 14);
+
+  // 模式微標籤
+  waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
+  waveCtx.fillStyle = 'rgba(250, 204, 21, 0.9)';
+  waveCtx.textAlign = 'right';
+  const modeBadgeText = state.phaseBarMode === 'diff' ? 'ΔL' : 'cos φ';
+  waveCtx.fillText(modeBadgeText, boxLeft + totalBoxW - 8, boxTop + 14);
+
+  // 3. 繪製刻度垂直參考線與標籤
+  const isDiffMode = (state.phaseBarMode === 'diff');
+
+  if (isDiffMode) {
+    // 基準線 0λ (左側縱軸)
+    waveCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    waveCtx.lineWidth = 1.6;
+    waveCtx.beginPath();
+    waveCtx.moveTo(chartLeft, topBarY - 6);
+    waveCtx.lineTo(chartLeft, botBarY + 6);
+    waveCtx.stroke();
+
+    waveCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
+    waveCtx.textAlign = 'center';
+    waveCtx.fillText('0', chartLeft, boxTop + 24);
+
+    // λ/2 (180° 相消參考線 - 粉紅虛線)
+    const xHalf = chartLeft + 0.5 * pxPerLambda;
+    if (xHalf <= chartRight + 2) {
+      waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.65)';
+      waveCtx.lineWidth = 1.5;
+      waveCtx.setLineDash([3, 3]);
+      waveCtx.beginPath();
+      waveCtx.moveTo(xHalf, topBarY - 6);
+      waveCtx.lineTo(xHalf, botBarY + 6);
+      waveCtx.stroke();
+      waveCtx.setLineDash([]);
+
+      waveCtx.fillStyle = '#fda4af';
+      waveCtx.fillText('λ/2', xHalf, boxTop + 24);
+    }
+
+    // 1.0λ (360° 參考線 - 青藍虛線)
+    const xOne = chartLeft + 1.0 * pxPerLambda;
+    if (xOne <= chartRight + 2) {
+      waveCtx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+      waveCtx.lineWidth = 1.5;
+      waveCtx.setLineDash([3, 3]);
+      waveCtx.beginPath();
+      waveCtx.moveTo(xOne, topBarY - 6);
+      waveCtx.lineTo(xOne, botBarY + 6);
+      waveCtx.stroke();
+      waveCtx.setLineDash([]);
+
+      waveCtx.fillStyle = '#38bdf8';
+      waveCtx.fillText('1λ', xOne, boxTop + 24);
+    }
+
+    // 2.0λ (若刻度支援)
+    if (scaleMaxLambda >= 2.0) {
+      const xTwo = chartLeft + 2.0 * pxPerLambda;
+      if (xTwo <= chartRight - 2) {
+        waveCtx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+        waveCtx.lineWidth = 1.2;
+        waveCtx.setLineDash([2, 3]);
+        waveCtx.beginPath();
+        waveCtx.moveTo(xTwo, topBarY - 6);
+        waveCtx.lineTo(xTwo, botBarY + 6);
+        waveCtx.stroke();
+        waveCtx.setLineDash([]);
+
+        waveCtx.fillStyle = '#facc15';
+        waveCtx.fillText('2λ', Math.min(xTwo, chartRight - 6), boxTop + 24);
+      }
+    }
+  } else {
+    // 即時波動位移模式：中央為 0 平衡位置，向右為正 (+1 波峰)，向左為負 (-1 波谷)
+    const chartMidX = chartLeft + chartW * 0.5;
+
+    waveCtx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    waveCtx.lineWidth = 1.5;
+    waveCtx.setLineDash([3, 3]);
+    waveCtx.beginPath();
+    waveCtx.moveTo(chartMidX, topBarY - 6);
+    waveCtx.lineTo(chartMidX, botBarY + 6);
+    waveCtx.stroke();
+    waveCtx.setLineDash([]);
+
+    waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
+    waveCtx.textAlign = 'center';
+    waveCtx.fillStyle = '#fda4af';
+    waveCtx.fillText('-1', chartLeft + 6, boxTop + 24);
+    waveCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    waveCtx.fillText('0', chartMidX, boxTop + 24);
+    waveCtx.fillStyle = '#38bdf8';
+    waveCtx.fillText('+1', chartRight - 6, boxTop + 24);
+  }
+
+  // 4. 連接導引虛線：從柱狀圖右側延伸連到狹縫各波源點
+  pointData.forEach(d => {
+    waveCtx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    waveCtx.lineWidth = 1.0;
+    waveCtx.setLineDash([2, 2]);
+    waveCtx.beginPath();
+    waveCtx.moveTo(chartRight, d.src.y);
+    waveCtx.lineTo(d.src.x - 7, d.src.y);
+    waveCtx.stroke();
+  });
+  waveCtx.setLineDash([]);
+
+  // 5. 繪製各橫向柱條
+  const spacing = state.slitWidth / Math.max(1, N);
+  const barH = Math.max(2.4, Math.min(8.0, spacing * 0.68));
+
+  // 互補色彩計算工具：相差 180° (半波長) 呈現互補色對 (青藍 ↔ 珊瑚粉紅，翠綠 ↔ 紫羅蘭)
+  function getPhaseColor(cycle, alpha = 1.0) {
+    const hue = ((cycle * 360 + 190) % 360).toFixed(0);
+    return `hsla(${hue}, 95%, 58%, ${alpha})`;
+  }
+
+  // 計算當前是否有懸停點，並找出與其相位差最接近 180° (0.50λ) 的相消夥伴
+  let hoveredPartnerIdx = -1;
+  let hoveredIsDestructive = false;
+  if (state.hoveredBarIdx >= 0 && state.hoveredBarIdx < N) {
+    const hData = pointData[state.hoveredBarIdx];
+    let minErr = 999;
+    for (let j = 0; j < N; j++) {
+      if (j === state.hoveredBarIdx) continue;
+      const diff = Math.abs(pointData[j].pathLambda - hData.pathLambda);
+      const mHalf = Math.floor(diff) + 0.5;
+      const err = Math.abs(diff - mHalf);
+      if (err < minErr && diff > 0.05) {
+        minErr = err;
+        hoveredPartnerIdx = j;
+        hoveredIsDestructive = (err < 0.12);
+      }
+    }
+  }
+
+  pointData.forEach(d => {
+    const i = d.idx;
+    const isHovered = (state.hoveredBarIdx === i);
+    const isPartner = (hoveredPartnerIdx === i && hoveredIsDestructive);
+    const isSelected = enabledMap.has(i);
+    const barY = d.src.y - barH * 0.5;
+
+    let barX = chartLeft;
+    let barLen = 2;
+    let colorStart = '';
+    let colorEnd = '';
+
+    if (isDiffMode) {
+      barLen = Math.max(2, (d.pathLambda / scaleMaxLambda) * chartW);
+      barX = chartLeft;
+      colorStart = getPhaseColor(d.phaseCycle, isHovered ? 1.0 : 0.72);
+      colorEnd = getPhaseColor(d.phaseCycle, 1.0);
+    } else {
+      // 即時波動位移
+      const chartMidX = chartLeft + chartW * 0.5;
+      const disp = Math.cos(state.wavePhase - d.phaseOffset);
+      const span = (chartW * 0.48);
+      barLen = Math.max(2, Math.abs(disp) * span);
+      barX = disp >= 0 ? chartMidX : chartMidX - barLen;
+      if (disp >= 0) {
+        colorStart = isHovered ? 'rgba(0, 242, 254, 1)' : 'rgba(0, 242, 254, 0.72)';
+        colorEnd = '#00f2fe';
+      } else {
+        colorStart = isHovered ? 'rgba(244, 63, 94, 1)' : 'rgba(244, 63, 94, 0.72)';
+        colorEnd = '#f43f5e';
+      }
+    }
+
+    // 柱狀圖條本體
+    waveCtx.save();
+    if (isHovered || isPartner) {
+      waveCtx.shadowColor = isPartner ? '#f43f5e' : '#facc15';
+      waveCtx.shadowBlur = 10;
+    } else if (isSelected) {
+      const info = enabledMap.get(i);
+      waveCtx.shadowColor = info.fp.color;
+      waveCtx.shadowBlur = 8;
+    }
+
+    const grad = waveCtx.createLinearGradient(barX, 0, barX + barLen, 0);
+    grad.addColorStop(0, colorStart);
+    grad.addColorStop(1, colorEnd);
+    waveCtx.fillStyle = grad;
+
+    waveCtx.beginPath();
+    waveCtx.roundRect(barX, barY, barLen, barH, Math.min(barH * 0.5, 4));
+    waveCtx.fill();
+
+    // 邊框高亮
+    if (isHovered || isPartner || isSelected) {
+      waveCtx.strokeStyle = isHovered ? '#ffffff' : (isPartner ? '#fda4af' : enabledMap.get(i).fp.color);
+      waveCtx.lineWidth = 1.6;
+      waveCtx.stroke();
+    }
+    waveCtx.restore();
+
+    // 已勾選的自由選點 (A, B, C, D) 標籤徽章：繪製於柱條左側
+    if (isSelected) {
+      const info = enabledMap.get(i);
+      waveCtx.save();
+      waveCtx.fillStyle = info.fp.color;
+      waveCtx.beginPath();
+      waveCtx.arc(boxLeft + 10, d.src.y, 6.5, 0, Math.PI * 2);
+      waveCtx.fill();
+
+      waveCtx.fillStyle = '#0b1120';
+      waveCtx.font = 'bold 9px "JetBrains Mono", sans-serif';
+      waveCtx.textAlign = 'center';
+      waveCtx.textBaseline = 'middle';
+      waveCtx.fillText(info.fp.label.replace('點 ', ''), boxLeft + 10, d.src.y);
+      waveCtx.restore();
+    }
+  });
+
+  // 6. 相消配對視覺化 (對應相消的可能性)
+  const halfN = Math.floor(N / 2);
+  const quarterN = Math.floor(N / 4);
+  const isNearMin1 = Math.abs(maxPathLambda - 1.0) < 0.15;
+  const isNearMin2 = Math.abs(maxPathLambda - 2.0) < 0.15;
+
+  if (isNearMin1 && N >= 6) {
+    waveCtx.save();
+    // 第一暗紋：狹縫上下兩半部 (相距 a/2) 普遍反相配對 (光程差 λ/2)
+    const pairsToShow = [
+      { i: 0, j: halfN },
+      { i: Math.max(1, Math.floor(halfN * 0.4)), j: Math.max(1, Math.floor(halfN * 0.4)) + halfN }
+    ];
+
+    pairsToShow.forEach(pair => {
+      if (pair.i < N && pair.j < N) {
+        const sA = sources[pair.i];
+        const sB = sources[pair.j];
+
+        waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
+        waveCtx.lineWidth = 1.5;
+        waveCtx.setLineDash([3, 2]);
+
+        waveCtx.beginPath();
+        waveCtx.moveTo(chartLeft - 4, sA.y);
+        waveCtx.bezierCurveTo(chartLeft - 18, sA.y, chartLeft - 18, sB.y, chartLeft - 4, sB.y);
+        waveCtx.stroke();
+      }
+    });
+    waveCtx.setLineDash([]);
+    waveCtx.restore();
+  } else if (isNearMin2 && N >= 8 && quarterN >= 1) {
+    waveCtx.save();
+    // 第二暗紋：狹縫四等分 (相距 a/4) 普遍反相配對 (光程差 λ/2)
+    const pairsToShow2 = [
+      { i: 0, j: quarterN },
+      { i: halfN, j: halfN + quarterN }
+    ];
+
+    pairsToShow2.forEach(pair => {
+      if (pair.i < N && pair.j < N) {
+        const sA = sources[pair.i];
+        const sB = sources[pair.j];
+
+        waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
+        waveCtx.lineWidth = 1.5;
+        waveCtx.setLineDash([3, 2]);
+
+        waveCtx.beginPath();
+        waveCtx.moveTo(chartLeft - 4, sA.y);
+        waveCtx.bezierCurveTo(chartLeft - 18, sA.y, chartLeft - 18, sB.y, chartLeft - 4, sB.y);
+        waveCtx.stroke();
+      }
+    });
+    waveCtx.setLineDash([]);
+    waveCtx.restore();
+  }
+
+  // 7. 若滑鼠正在懸停某個柱狀條，顯示精準相位數值與相消對照 Tooltip
+  if (state.hoveredBarIdx >= 0 && state.hoveredBarIdx < N) {
+    const hData = pointData[state.hoveredBarIdx];
+    waveCtx.save();
+
+    // 繪製該點與相消點的連結弧線
+    if (hoveredPartnerIdx >= 0 && hoveredIsDestructive) {
+      const sA = hData.src;
+      const sB = sources[hoveredPartnerIdx];
+      waveCtx.strokeStyle = '#f43f5e';
+      waveCtx.lineWidth = 2.0;
+      waveCtx.beginPath();
+      waveCtx.moveTo(chartLeft - 4, sA.y);
+      waveCtx.bezierCurveTo(chartLeft - 22, sA.y, chartLeft - 22, sB.y, chartLeft - 4, sB.y);
+      waveCtx.stroke();
+
+      // 在弧頂標註相消徽章 (靠左對齊，遠離狹縫擋板)
+      const midY = (sA.y + sB.y) * 0.5;
+      drawTextBadge(waveCtx, '反相相消 (ΔL = 0.5λ)', chartLeft - 24, midY, {
+        textColor: '#fda4af',
+        borderColor: '#f43f5e',
+        borderWidth: 1.5,
+        bgColor: 'rgba(11, 17, 32, 0.96)',
+        font: 'bold 11px "Noto Sans TC", sans-serif',
+        align: 'right'
+      });
+    }
+
+    // 柱狀圖左側懸浮標籤 (置於 boxLeft - 8 靠右對齊，指向左側寬敞區域，永不與狹縫擋板重疊)
+    const phaseValStr = `${hData.pathLambda.toFixed(2)}λ (${hData.phaseDeg.toFixed(0)}°)`;
+    const tipX = boxLeft - 8;
+    const tipY = hData.src.y;
+    drawTextBadge(waveCtx, `點 #${hData.idx}: ${phaseValStr}`, tipX, tipY, {
+      textColor: '#facc15',
+      borderColor: '#facc15',
+      borderWidth: 1.5,
+      bgColor: 'rgba(11, 17, 32, 0.95)',
+      font: 'bold 11px "JetBrains Mono", sans-serif',
+      align: 'right'
+    });
+
+    waveCtx.restore();
+  }
+
+  // 8. 底部教學結論狀態提示 (使用嚴格框線裁切與精簡文字，保證不超出框外與牆壁重疊)
+  waveCtx.save();
+  waveCtx.beginPath();
+  waveCtx.roundRect(boxLeft, boxTop, totalBoxW, totalBoxH, 10);
+  waveCtx.clip();
+
+  waveCtx.font = 'bold 9.5px "Noto Sans TC", sans-serif';
+  waveCtx.textAlign = 'left';
+  waveCtx.textBaseline = 'middle';
+  const bottomTextY = boxBottom - 10;
+  if (Math.abs(maxPathLambda - 1.0) < 0.12) {
+    waveCtx.fillStyle = '#fda4af';
+    waveCtx.fillText('★ 第一暗紋 (λ/2 相消)', boxLeft + 8, bottomTextY);
+  } else if (Math.abs(maxPathLambda - 2.0) < 0.15) {
+    waveCtx.fillStyle = '#fda4af';
+    waveCtx.fillText('★ 第二暗紋 (a/4 相消)', boxLeft + 8, bottomTextY);
+  } else if (maxPathLambda < 0.10) {
+    waveCtx.fillStyle = '#fef08a';
+    waveCtx.fillText('★ 中央極大 (同相)', boxLeft + 8, bottomTextY);
+  } else {
+    waveCtx.fillStyle = '#94a3b8';
+    waveCtx.fillText(`跨度: ${maxPathLambda.toFixed(2)}λ`, boxLeft + 8, bottomTextY);
+  }
+
+  waveCtx.restore();
+
+  waveCtx.restore();
+}
+
+function updateBottomBanner(isNearMin1, isNearMin2) {
   if (!bottomHudBanner) return;
 
   if (isNearMin1) {
     bottomHudBanner.style.display = 'flex';
-    bannerBadge.textContent = '★ 配對 (\u2460 ↔ \u2460\') 相消';
+    bannerBadge.textContent = '★ 第一暗紋 (a/2 配對相消)';
     bannerBadge.style.background = 'rgba(0, 242, 254, 0.25)';
     bannerBadge.style.borderColor = 'rgba(0, 242, 254, 0.6)';
     bannerBadge.style.color = '#00f2fe';
-    bannerText.innerHTML = '<strong>相距 a/2：</strong>光程差 <code>ΔL = (a/2)·sinθ</code>，第一暗紋時恰為 <code>λ/2</code> ⇒ 反相 180° 完全相消！';
+    bannerText.innerHTML = '<strong>相距 a/2 配對：</strong>光程差 <code>ΔL = (a/2)·sinθ = λ/2</code> ⇒ 上下半部對應點反相 180° 完全相消！';
+  } else if (isNearMin2) {
+    bottomHudBanner.style.display = 'flex';
+    bannerBadge.textContent = '★ 第二暗紋 (a/4 配對相消)';
+    bannerBadge.style.background = 'rgba(244, 63, 94, 0.25)';
+    bannerBadge.style.borderColor = 'rgba(244, 63, 94, 0.6)';
+    bannerBadge.style.color = '#fda4af';
+    bannerText.innerHTML = '<strong>狹縫四等分 (相距 a/4)：</strong>總光程差 <code>2λ</code>，相距 <code>a/4</code> 之對應點光程差恰為 <code>(a/4)·sinθ = λ/2</code> ⇒ 兩兩反相抵銷！';
   } else {
     bottomHudBanner.style.display = 'none';
   }
@@ -1152,7 +1613,7 @@ function renderScreenDisplays() {
 }
 
 /**
- * 子波疊加示波器 (自由選點版：最多4個點源，各自波形+合成波)
+ * 子波疊加示波器 (光強與相量分析儀：不顯示個別波形，只顯示疊加後的強度與相量羅盤)
  */
 function renderSuperpositionScope() {
   if (!scopeCanvas || !scopeCtx) return;
@@ -1165,7 +1626,6 @@ function renderSuperpositionScope() {
   const thetaRad = (state.thetaDeg * Math.PI) / 180;
   const sinT = Math.sin(thetaRad);
   const k = (2 * Math.PI) / state.wavelength;
-  const kSpatial = (4 * Math.PI) / w;
 
   const simEl = document.getElementById('sim-container');
   const simRect = simEl ? simEl.getBoundingClientRect() : { width: 600, height: 400 };
@@ -1173,161 +1633,333 @@ function renderSuperpositionScope() {
   const N = geom.sources.length;
 
   const enabledPoints = state.freePoints
-    .filter(function(fp) { return fp.enabled; })
-    .map(function(fp) {
+    .filter(function (fp) { return fp.enabled; })
+    .map(function (fp) {
       const clampedIdx = Math.max(0, Math.min(N - 1, fp.idx));
       const src = geom.sources[clampedIdx];
       const refY = geom.sources[0].y;
       const dy = src.y - refY;
       const extraPath = dy * sinT;
       const phaseOffset = k * extraPath;
-      return { color: fp.color, label: fp.label, idx: clampedIdx, phaseOffset: phaseOffset };
+      return {
+        color: fp.color,
+        label: fp.label,
+        idx: clampedIdx,
+        phaseOffset: phaseOffset,
+        cosPhi: Math.cos(phaseOffset),
+        sinPhi: Math.sin(phaseOffset)
+      };
     });
 
   if (enabledPoints.length === 0) {
-    scopeCtx.fillStyle = 'rgba(148,163,184,0.5)';
-    scopeCtx.font = 'bold 14px "Noto Sans TC", sans-serif';
+    scopeCtx.fillStyle = 'rgba(148, 163, 184, 0.6)';
+    scopeCtx.font = 'bold 13px "Noto Sans TC", sans-serif';
     scopeCtx.textAlign = 'center';
     scopeCtx.textBaseline = 'middle';
-    scopeCtx.fillText('請勾選至少一個子波點源', w / 2, h / 2);
+    scopeCtx.fillText('請勾選至少一個子波點源 (A/B/C/D)', w / 2, h / 2);
     if (scopeLegend) scopeLegend.innerHTML = '';
     if (scopeBadge) {
       scopeBadge.textContent = '未選點';
-      scopeBadge.style.background = 'rgba(100,116,139,0.2)';
-      scopeBadge.style.borderColor = 'rgba(100,116,139,0.4)';
+      scopeBadge.style.background = 'rgba(100, 116, 139, 0.2)';
+      scopeBadge.style.borderColor = 'rgba(100, 116, 139, 0.4)';
       scopeBadge.style.color = '#94a3b8';
     }
     return;
   }
 
   const nPts = enabledPoints.length;
-  // 分軌顯示：每個勾選點佔一軌，最下方一軌為合成波
-  const totalLanes = nPts + 1;
-  const laneH = h / totalLanes;
 
-  // 單一點源的振幅基準：確保 N 點完全建設性干涉時，合成波振幅為 N * indAmp 且視覺顯著
-  const indAmp = (laneH * 0.40) / Math.max(1, (nPts * 0.35 + 0.65));
-
-  // 1. 各分軌水平基準線
-  scopeCtx.strokeStyle = 'rgba(255,255,255,0.08)';
-  scopeCtx.lineWidth = 1;
-  for (let i = 0; i <= nPts; i++) {
-    const ly = laneH * (i + 0.5);
-    scopeCtx.beginPath();
-    scopeCtx.moveTo(0, ly);
-    scopeCtx.lineTo(w, ly);
-    scopeCtx.stroke();
-  }
-
-  // 2. 繪製各點源的個別波形
-  enabledPoints.forEach(function(fp, i) {
-    const laneY = laneH * (i + 0.5);
-    scopeCtx.strokeStyle = fp.color;
-    scopeCtx.lineWidth = 2.0;
-    scopeCtx.shadowColor = fp.color;
-    scopeCtx.shadowBlur = 4;
-    scopeCtx.beginPath();
-    for (let x = 0; x < w; x++) {
-      const y = laneY - indAmp * Math.cos(kSpatial * x - state.wavePhase - fp.phaseOffset);
-      if (x === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
-    }
-    scopeCtx.stroke();
-    scopeCtx.shadowBlur = 0;
-
-    // 分軌文字標籤：放置於該分軌頂端安全區，加上深色半透明背景徽章，永不被頂部邊緣遮擋
-    scopeCtx.save();
-    scopeCtx.font = 'bold 11px "JetBrains Mono", sans-serif';
-    scopeCtx.textBaseline = 'top';
-    scopeCtx.textAlign = 'left';
-    const phaseVal = (fp.phaseOffset / (2 * Math.PI)).toFixed(2);
-    const labelText = `${fp.label} (#${fp.idx})  相位: ${phaseVal} λ`;
-    const tw = scopeCtx.measureText(labelText).width;
-    const labelY = Math.max(2, i * laneH + 2);
-
-    scopeCtx.fillStyle = 'rgba(8, 13, 25, 0.85)';
-    scopeCtx.beginPath();
-    scopeCtx.roundRect(6, labelY, tw + 8, 15, 3);
-    scopeCtx.fill();
-
-    scopeCtx.fillStyle = fp.color;
-    scopeCtx.fillText(labelText, 10, labelY + 1);
-    scopeCtx.restore();
-  });
-
-  // 3. 繪製合成波 (疊加)
-  const sumLaneY = laneH * (nPts + 0.5);
-  scopeCtx.strokeStyle = '#facc15';
-  scopeCtx.lineWidth = 2.8;
-  scopeCtx.shadowColor = '#facc15';
-  scopeCtx.shadowBlur = 8;
-  scopeCtx.beginPath();
-  for (let x = 0; x < w; x++) {
-    let sum = 0;
-    enabledPoints.forEach(function(fp) {
-      sum += Math.cos(kSpatial * x - state.wavePhase - fp.phaseOffset);
-    });
-    // 合成波真實振幅：建設性時為 N * indAmp，相消時為 0
-    const y = sumLaneY - indAmp * sum;
-    if (x === 0) scopeCtx.moveTo(x, y); else scopeCtx.lineTo(x, y);
-  }
-  scopeCtx.stroke();
-  scopeCtx.shadowBlur = 0;
-
-  // 計算相量疊加真實大小
+  // 計算相量向量總和
   let sumCos = 0;
   let sumSin = 0;
-  enabledPoints.forEach(function(fp) {
-    sumCos += Math.cos(fp.phaseOffset);
-    sumSin += Math.sin(fp.phaseOffset);
+  enabledPoints.forEach(function (fp) {
+    sumCos += fp.cosPhi;
+    sumSin += fp.sinPhi;
   });
-  const phasorAmp = Math.sqrt(sumCos * sumCos + sumSin * sumSin); // 0 ~ nPts
-  const normAmp = phasorAmp / Math.max(1, nPts); // 0 ~ 1
 
-  // 合成波分軌標籤 (顯示真實振幅與相長/相消百分比)
+  const amp = Math.sqrt(sumCos * sumCos + sumSin * sumSin); // 0 ~ nPts
+  const maxAmp = nPts;
+  const normAmp = amp / Math.max(1, maxAmp); // 0 ~ 1
+  const intensity = amp * amp; // 0 ~ nPts^2
+  const maxIntensity = nPts * nPts;
+  const normIntensity = intensity / Math.max(1, maxIntensity); // 0 ~ 1
+
+  // ==========================================
+  // 1. 左側：相量疊加羅盤 (Phasor Vector Dial)
+  // ==========================================
+  const dialCx = 56;
+  const dialCy = Math.floor(h * 0.48);
+  const dialR = Math.min(38, Math.floor(h * 0.36));
+
   scopeCtx.save();
-  scopeCtx.font = 'bold 11px "JetBrains Mono", sans-serif';
-  scopeCtx.textBaseline = 'top';
-  scopeCtx.textAlign = 'left';
-  const sumLabelY = Math.max(2, nPts * laneH + 2);
-  const sumText = `合成波 (疊加)  振幅: ${phasorAmp.toFixed(2)} A₀ (${(normAmp * 100).toFixed(0)}%)`;
-  const stw = scopeCtx.measureText(sumText).width;
-
-  scopeCtx.fillStyle = 'rgba(8, 13, 25, 0.85)';
+  // 羅盤背景圓盤
+  scopeCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  scopeCtx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  scopeCtx.lineWidth = 1;
   scopeCtx.beginPath();
-  scopeCtx.roundRect(6, sumLabelY, stw + 8, 15, 3);
+  scopeCtx.arc(dialCx, dialCy, dialR, 0, Math.PI * 2);
   scopeCtx.fill();
+  scopeCtx.stroke();
 
-  scopeCtx.fillStyle = '#facc15';
-  scopeCtx.fillText(sumText, 10, sumLabelY + 1);
+  // 羅盤十字軸與虛線同心圓 (0.5 R)
+  scopeCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  scopeCtx.beginPath();
+  scopeCtx.moveTo(dialCx - dialR, dialCy);
+  scopeCtx.lineTo(dialCx + dialR, dialCy);
+  scopeCtx.moveTo(dialCx, dialCy - dialR);
+  scopeCtx.lineTo(dialCx + dialR, dialCy);
+  scopeCtx.stroke();
+
+  scopeCtx.setLineDash([2, 2]);
+  scopeCtx.beginPath();
+  scopeCtx.arc(dialCx, dialCy, dialR * 0.5, 0, Math.PI * 2);
+  scopeCtx.stroke();
+  scopeCtx.setLineDash([]);
+
+  // 繪製各勾選點的個別相量箭頭 (起點在原點，長度 dialR * 0.78)
+  const vecLen = dialR * 0.78;
+  enabledPoints.forEach(function (fp) {
+    const vx = dialCx + vecLen * fp.cosPhi;
+    const vy = dialCy - vecLen * fp.sinPhi; // Canvas Y 軸向下
+
+    scopeCtx.strokeStyle = fp.color;
+    scopeCtx.lineWidth = 1.8;
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(dialCx, dialCy);
+    scopeCtx.lineTo(vx, vy);
+    scopeCtx.stroke();
+
+    // 箭頭端點小圓點
+    scopeCtx.fillStyle = fp.color;
+    scopeCtx.beginPath();
+    scopeCtx.arc(vx, vy, 2.5, 0, Math.PI * 2);
+    scopeCtx.fill();
+  });
+
+  // 繪製合成相量箭頭 (總和相量 A_total，粗金色發光箭頭)
+  if (amp > 0.08) {
+    const totalScale = (amp / maxAmp) * dialR * 0.92;
+    const totalAngle = Math.atan2(sumSin, sumCos);
+    const tx = dialCx + totalScale * Math.cos(totalAngle);
+    const ty = dialCy - totalScale * Math.sin(totalAngle);
+
+    scopeCtx.save();
+    scopeCtx.strokeStyle = '#facc15';
+    scopeCtx.lineWidth = 3.0;
+    scopeCtx.shadowColor = 'rgba(250, 204, 21, 0.8)';
+    scopeCtx.shadowBlur = 8;
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(dialCx, dialCy);
+    scopeCtx.lineTo(tx, ty);
+    scopeCtx.stroke();
+
+    // 箭頭前端三角形
+    scopeCtx.fillStyle = '#facc15';
+    const arrowLen = 7;
+    const headAngle = Math.atan2(dialCy - ty, tx - dialCx);
+    scopeCtx.beginPath();
+    scopeCtx.moveTo(tx, ty);
+    scopeCtx.lineTo(
+      tx - arrowLen * Math.cos(headAngle - Math.PI / 6),
+      ty + arrowLen * Math.sin(headAngle - Math.PI / 6)
+    );
+    scopeCtx.lineTo(
+      tx - arrowLen * Math.cos(headAngle + Math.PI / 6),
+      ty + arrowLen * Math.sin(headAngle + Math.PI / 6)
+    );
+    scopeCtx.closePath();
+    scopeCtx.fill();
+    scopeCtx.restore();
+  } else {
+    // 振幅 ≈ 0 完全破壞性相消：中央亮紅點
+    scopeCtx.save();
+    scopeCtx.fillStyle = '#f43f5e';
+    scopeCtx.shadowColor = '#f43f5e';
+    scopeCtx.shadowBlur = 10;
+    scopeCtx.beginPath();
+    scopeCtx.arc(dialCx, dialCy, 4.5, 0, Math.PI * 2);
+    scopeCtx.fill();
+    scopeCtx.restore();
+  }
+
+  // 羅盤下方微文字
+  scopeCtx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+  scopeCtx.font = 'bold 9px "Noto Sans TC", sans-serif';
+  scopeCtx.textAlign = 'center';
+  scopeCtx.textBaseline = 'top';
+  scopeCtx.fillText('相量疊加 (向量和)', dialCx, dialCy + dialR + 4);
   scopeCtx.restore();
 
-  // 更新示波器右上角狀態徽章
+  // ==========================================
+  // 2. 右側：疊加後光強儀表與數據卡片
+  // ==========================================
+  const rightX = 114;
+  const rightW = w - rightX - 10;
+
+  // (A) 頂端標題與百分比
+  scopeCtx.font = 'bold 11px "Noto Sans TC", sans-serif';
+  scopeCtx.textAlign = 'left';
+  scopeCtx.textBaseline = 'top';
+  scopeCtx.fillStyle = '#94a3b8';
+  scopeCtx.fillText('疊加總光強 (Superposed Intensity)', rightX, 10);
+
+  // (B) 光強進度條 (Gauge Bar)
+  const barY = 27;
+  const barH = 18;
+  scopeCtx.save();
+  scopeCtx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+  scopeCtx.strokeStyle = 'rgba(51, 65, 85, 0.8)';
+  scopeCtx.lineWidth = 1;
+  scopeCtx.beginPath();
+  scopeCtx.roundRect(rightX, barY, rightW, barH, 5);
+  scopeCtx.fill();
+  scopeCtx.stroke();
+
+  // 進度填充
+  const fillW = Math.max(4, rightW * normIntensity);
+  const fillGrad = scopeCtx.createLinearGradient(rightX, 0, rightX + fillW, 0);
+  if (normIntensity < 0.05) {
+    fillGrad.addColorStop(0, '#f43f5e');
+    fillGrad.addColorStop(1, '#e11d48');
+  } else {
+    fillGrad.addColorStop(0, '#00f2fe');
+    fillGrad.addColorStop(0.6, '#38bdf8');
+    fillGrad.addColorStop(1, '#facc15');
+  }
+
+  scopeCtx.fillStyle = fillGrad;
+  scopeCtx.shadowColor = normIntensity < 0.05 ? 'rgba(244, 63, 94, 0.6)' : 'rgba(0, 242, 254, 0.5)';
+  scopeCtx.shadowBlur = 6;
+  scopeCtx.beginPath();
+  scopeCtx.roundRect(rightX + 1, barY + 1, fillW - 2, barH - 2, 4);
+  scopeCtx.fill();
+  scopeCtx.shadowBlur = 0;
+
+  // 進度條上文字標籤 (百分比)
+  scopeCtx.font = 'bold 10px "JetBrains Mono", sans-serif';
+  scopeCtx.textBaseline = 'middle';
+  const pctStr = `${(normIntensity * 100).toFixed(1)}%`;
+  if (fillW > 48) {
+    scopeCtx.textAlign = 'right';
+    scopeCtx.fillStyle = '#0b1120';
+    scopeCtx.fillText(pctStr, rightX + fillW - 6, barY + barH * 0.5);
+  } else {
+    scopeCtx.textAlign = 'left';
+    scopeCtx.fillStyle = normIntensity < 0.05 ? '#fda4af' : '#facc15';
+    scopeCtx.fillText(pctStr, rightX + fillW + 6, barY + barH * 0.5);
+  }
+  scopeCtx.restore();
+
+  // (C) 兩個數值小卡片 (合成振幅 A 與 疊加光強 I)
+  const cardY = 52;
+  const cardH = 34;
+  const cardGap = 8;
+  const cardW = (rightW - cardGap) * 0.5;
+
+  // 卡片 1: 振幅 A
+  scopeCtx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+  scopeCtx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+  scopeCtx.lineWidth = 1;
+  scopeCtx.beginPath();
+  scopeCtx.roundRect(rightX, cardY, cardW, cardH, 5);
+  scopeCtx.fill();
+  scopeCtx.stroke();
+
+  scopeCtx.font = '9px "Noto Sans TC", sans-serif';
+  scopeCtx.fillStyle = '#94a3b8';
+  scopeCtx.textAlign = 'left';
+  scopeCtx.textBaseline = 'top';
+  scopeCtx.fillText('疊加總振幅 A', rightX + 6, cardY + 4);
+
+  scopeCtx.font = 'bold 12px "JetBrains Mono", sans-serif';
+  scopeCtx.fillStyle = '#38bdf8';
+  scopeCtx.fillText(`${amp.toFixed(2)} A₀`, rightX + 6, cardY + 16);
+
+  // 卡片 2: 光強 I
+  const card2X = rightX + cardW + cardGap;
+  scopeCtx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+  scopeCtx.strokeStyle = 'rgba(250, 204, 21, 0.25)';
+  scopeCtx.beginPath();
+  scopeCtx.roundRect(card2X, cardY, cardW, cardH, 5);
+  scopeCtx.fill();
+  scopeCtx.stroke();
+
+  scopeCtx.font = '9px "Noto Sans TC", sans-serif';
+  scopeCtx.fillStyle = '#94a3b8';
+  scopeCtx.fillText('疊加總光強 I', card2X + 6, cardY + 4);
+
+  scopeCtx.font = 'bold 12px "JetBrains Mono", sans-serif';
+  scopeCtx.fillStyle = normIntensity < 0.05 ? '#fda4af' : '#facc15';
+  scopeCtx.fillText(`${intensity.toFixed(2)} I₀`, card2X + 6, cardY + 16);
+
+  // (D) 底部干涉狀態膠囊條 (Status Capsule)
+  const statusY = 93;
+  const statusH = 24;
+  scopeCtx.save();
+  let statusText = '';
+  let statusBg = '';
+  let statusBorder = '';
+  let statusColor = '';
+
+  if (normIntensity < 0.04) {
+    statusText = '💥 完全相消干涉 (振幅抵銷 A ≈ 0)';
+    statusBg = 'rgba(244, 63, 94, 0.18)';
+    statusBorder = 'rgba(244, 63, 94, 0.5)';
+    statusColor = '#fda4af';
+  } else if (normIntensity > 0.94) {
+    statusText = `⚡ 完全同相相長 (I = ${(normIntensity * 100).toFixed(0)}%)`;
+    statusBg = 'rgba(250, 204, 21, 0.18)';
+    statusBorder = 'rgba(250, 204, 21, 0.5)';
+    statusColor = '#fef08a';
+  } else {
+    statusText = `🌊 部分干涉疊加 (相對光強 ${(normIntensity * 100).toFixed(1)}%)`;
+    statusBg = 'rgba(56, 189, 248, 0.14)';
+    statusBorder = 'rgba(56, 189, 248, 0.35)';
+    statusColor = '#38bdf8';
+  }
+
+  scopeCtx.fillStyle = statusBg;
+  scopeCtx.strokeStyle = statusBorder;
+  scopeCtx.lineWidth = 1;
+  scopeCtx.beginPath();
+  scopeCtx.roundRect(rightX, statusY, rightW, statusH, 5);
+  scopeCtx.fill();
+  scopeCtx.stroke();
+
+  scopeCtx.font = 'bold 10px "Noto Sans TC", sans-serif';
+  scopeCtx.fillStyle = statusColor;
+  scopeCtx.textAlign = 'center';
+  scopeCtx.textBaseline = 'middle';
+  scopeCtx.fillText(statusText, rightX + rightW * 0.5, statusY + statusH * 0.5);
+  scopeCtx.restore();
+
+  // (E) 更新右上角示波器狀態徽章
   if (scopeBadge) {
-    if (normAmp < 0.08) {
-      scopeBadge.textContent = '完全相消 (振幅 ≈ 0)';
+    if (normIntensity < 0.04) {
+      scopeBadge.textContent = '完全相消 (I ≈ 0)';
       scopeBadge.style.background = 'rgba(244,63,94,0.25)';
       scopeBadge.style.borderColor = 'rgba(244,63,94,0.6)';
       scopeBadge.style.color = '#fda4af';
-    } else if (normAmp > 0.94) {
-      scopeBadge.textContent = `完全相長 (振幅 = ${phasorAmp.toFixed(1)} A₀)`;
+    } else if (normIntensity > 0.94) {
+      scopeBadge.textContent = '完全相長 (I = 100%)';
       scopeBadge.style.background = 'rgba(250,204,21,0.25)';
       scopeBadge.style.borderColor = 'rgba(250,204,21,0.6)';
       scopeBadge.style.color = '#fef08a';
     } else {
-      scopeBadge.textContent = `部分疊加 (${phasorAmp.toFixed(2)} A₀, ${(normAmp * 100).toFixed(0)}%)`;
+      scopeBadge.textContent = `部分疊加 (${(normIntensity * 100).toFixed(0)}%)`;
       scopeBadge.style.background = 'rgba(56,189,248,0.15)';
       scopeBadge.style.borderColor = 'rgba(56,189,248,0.4)';
       scopeBadge.style.color = '#38bdf8';
     }
   }
 
-  // 更新底部圖例
+  // (F) 更新底部圖例 (列出已勾選點的相位與最終疊加強度)
   if (scopeLegend) {
-    const items = enabledPoints.map(function(fp) {
+    const items = enabledPoints.map(function (fp) {
       const phaseVal = (fp.phaseOffset / (2 * Math.PI)).toFixed(2);
       return '<span class="legend-item"><span class="dot-indicator" style="background:' + fp.color + ';box-shadow:0 0 6px ' + fp.color + '"></span> ' + fp.label + ' (#' + fp.idx + ', ' + phaseVal + 'λ)</span>';
     });
-    items.push('<span class="legend-item"><span class="dot-indicator dot-yellow"></span> 合成波: ' + phasorAmp.toFixed(2) + ' A₀</span>');
+    items.push('<span class="legend-item"><span class="dot-indicator dot-yellow"></span> 疊加強度: ' + (normIntensity * 100).toFixed(1) + '%</span>');
     scopeLegend.innerHTML = items.join('');
   }
 }
@@ -1374,6 +2006,11 @@ function updateMetrics() {
     valInterference.textContent = `部分干涉 (I ≈ ${(curI * 100).toFixed(1)}%)`;
     valInterference.style.color = 'var(--text-main)';
   }
+
+  // 同步更新底部 HUD 相消教學橫幅 (第一暗紋 a/2 配對與第二暗紋 a/4 配對)
+  const isNearMin1 = Math.abs(Math.abs(a * sinT) - wl) < wl * 0.12;
+  const isNearMin2 = Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.12;
+  updateBottomBanner(isNearMin1, isNearMin2);
 }
 
 /**
@@ -1394,8 +2031,18 @@ function animationLoop() {
     state.wavePhase += state.waveSpeed;
   }
 
-  drawWaveScene();
-  renderSuperpositionScope();
+  try {
+    drawWaveScene();
+  } catch (err) {
+    console.error('drawWaveScene error:', err);
+  }
+
+  try {
+    renderSuperpositionScope();
+  } catch (err) {
+    console.error('renderSuperpositionScope error:', err);
+  }
+
   animFrameId = requestAnimationFrame(animationLoop);
 }
 
@@ -1475,8 +2122,8 @@ function initEvents() {
     const rect = simContainer.getBoundingClientRect();
     const geom = getSlitGeometry(rect.width, rect.height);
     state.zoom = 2.4;
-    // 將狹縫對焦置中偏左展示
-    state.panX = rect.width * 0.36 - geom.slitX * state.zoom;
+    // 將狹縫對焦置中展示，預留充足空間給左側相位柱狀圖
+    state.panX = rect.width * 0.46 - geom.slitX * state.zoom;
     state.panY = rect.height * 0.50 - geom.centerY * state.zoom;
     updateZoomUI();
   });
@@ -1504,7 +2151,19 @@ function initEvents() {
     updateZoomUI();
   }, { passive: false });
 
-  // 5. 自由選點 UI 已由上方 buildFreePointsUI 建立完成
+  // 5. 柱狀圖模式切換 (光程差 ΔL ↔ 即時波動位移 cos φ)
+  if (btnPhasebarMode) {
+    btnPhasebarMode.addEventListener('click', () => {
+      state.phaseBarMode = (state.phaseBarMode === 'diff' ? 'wave' : 'diff');
+      if (state.phaseBarMode === 'diff') {
+        btnPhasebarMode.textContent = '📊 模式: 光程差 ΔL';
+        btnPhasebarMode.title = '當前：光程差與相對相位。點擊切換為即時波動位移 cos φ';
+      } else {
+        btnPhasebarMode.textContent = '🌊 模式: 即時位移 cos';
+        btnPhasebarMode.title = '當前：即時波動位移。點擊切換為光程差與相對相位 ΔL';
+      }
+    });
+  }
 
   // 6. 顯示圖層切換 (Toggle Pills)
   document.querySelectorAll('.toggle-pill').forEach(pill => {
@@ -1547,7 +2206,7 @@ function initEvents() {
 
   // sliderP2 removed: handled via free-points UI
 
-    // 8. 滑鼠拖拉平移畫面 (預設全畫面自由拖曳)、狹縫點源點選配對 ② 與 角度把手旋轉
+  // 8. 滑鼠拖拉平移畫面 (預設全畫面自由拖曳)、狹縫點源點選配對 ② 與 角度把手旋轉
   let isInteracting = false;
   let interactionMode = 'pan'; // 'pan' (拖拉畫面) | 'angle' (旋轉角度)
 
@@ -1562,7 +2221,23 @@ function initEvents() {
     const worldY = (y - state.panY) / state.zoom;
     const geom = getSlitGeometry(rect.width, rect.height);
 
-    // (click-to-select removed: use free-points sliders)
+    // 點擊柱狀圖條：將點設為自由選點 A，方便立刻在示波器觀察
+    if (state.layers.phasebars && state.hoveredBarIdx >= 0 && geom.sources.length > 0) {
+      const slitX = geom.slitX;
+      const chartRight = slitX - 24;
+      const chartW = Math.min(115, Math.max(76, slitX * 0.48));
+      const chartLeft = chartRight - chartW;
+      const boxLeft = chartLeft - 16;
+      const boxRight = chartRight + 12;
+      if (worldX >= boxLeft && worldX <= boxRight) {
+        if (state.freePoints && state.freePoints[0]) {
+          state.freePoints[0].idx = state.hoveredBarIdx;
+          state.freePoints[0].enabled = true;
+          buildFreePointsUI();
+          renderSuperpositionScope();
+        }
+      }
+    }
 
     const thetaRad = (state.thetaDeg * Math.PI) / 180;
     const rayLen = Math.min(rect.width * 0.65, 480);
@@ -1597,7 +2272,7 @@ function initEvents() {
     } else if (interactionMode === 'angle' && isInteracting) {
       updateAngleByPointer(clientX, clientY);
     } else {
-      // 懸停時動態切換游標：把手上為 pointer，上半部點源為 pointer，其他為 grab
+      // 懸停時動態切換游標：柱狀圖條為 pointer，把手上為 pointer，其他為 grab
       const rect = simContainer.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
@@ -1610,7 +2285,42 @@ function initEvents() {
       const handleX = geom.slitX + handleR * Math.cos(thetaRad);
       const handleY = geom.centerY + handleR * Math.sin(thetaRad);
 
-      if (Math.hypot(worldX - handleX, worldY - handleY) < 36) {
+      let foundBar = false;
+      if (state.layers.phasebars && geom.sources.length > 0) {
+        const slitX = geom.slitX;
+        const chartRight = slitX - 24;
+        const chartW = Math.min(115, Math.max(76, slitX * 0.48));
+        const chartLeft = chartRight - chartW;
+        const boxLeft = chartLeft - 16;
+        const boxRight = chartRight + 12;
+        const topY = geom.sources[0].y;
+        const botY = geom.sources[geom.sources.length - 1].y;
+
+        if (worldX >= boxLeft && worldX <= boxRight && worldY >= topY - 34 && worldY <= botY + 24) {
+          let bestIdx = -1;
+          let minDist = 999;
+          geom.sources.forEach((s, idx) => {
+            const dist = Math.abs(worldY - s.y);
+            if (dist < minDist) {
+              minDist = dist;
+              bestIdx = idx;
+            }
+          });
+          if (minDist < 20) {
+            state.hoveredBarIdx = bestIdx;
+            simContainer.style.cursor = 'pointer';
+            foundBar = true;
+          }
+        }
+      }
+
+      if (!foundBar && state.hoveredBarIdx !== -1) {
+        state.hoveredBarIdx = -1;
+      }
+
+      if (foundBar) {
+        // 保持 pointer 游標
+      } else if (Math.hypot(worldX - handleX, worldY - handleY) < 36) {
         simContainer.style.cursor = 'pointer';
       } else {
         simContainer.style.cursor = 'grab';
@@ -1639,14 +2349,22 @@ function initEvents() {
     renderScreenDisplays();
   }
 
-  // 滑鼠事件 - 明確追蹤 down/move/up 配對，確保拖拉完全可靠
+  // 滑鼠事件 - 懸停檢測與拖曳平移
   simContainer.addEventListener('mousedown', (e) => {
     e.preventDefault();
     handlePointerStart(e.clientX, e.clientY);
   });
 
+  simContainer.addEventListener('mousemove', (e) => {
+    handlePointerMove(e.clientX, e.clientY);
+  });
+
+  simContainer.addEventListener('mouseleave', () => {
+    state.hoveredBarIdx = -1;
+  });
+
   window.addEventListener('mousemove', (e) => {
-    if (!isInteracting && !state.isPanning) return; // 提前退出，減少不必要計算
+    if (!isInteracting && !state.isPanning) return; // 拖曳中即使移出容器仍繼續平移
     handlePointerMove(e.clientX, e.clientY);
   });
 
@@ -1689,6 +2407,11 @@ function initEvents() {
         state.slitWidth = 60;
         state.wavelength = 12;
         state.thetaDeg = (Math.asin(12 / 60) * 180) / Math.PI; // ≈ 11.5°
+        break;
+      case 'min2':
+        state.slitWidth = 60;
+        state.wavelength = 12;
+        state.thetaDeg = (Math.asin(24 / 60) * 180) / Math.PI; // ≈ 23.6°
         break;
       case 'max1':
         state.slitWidth = 60;

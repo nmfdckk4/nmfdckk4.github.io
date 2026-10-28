@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>單狹縫繞射與惠更斯原理</title>
+  <title>單狹縫繞射與惠更斯原理 - 數位黑板教學互動系統</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -72,6 +72,8 @@
           <button id="btn-focus-slit" class="zoom-btn highlight-zoom" title="特寫放大觀察狹縫開口處 (2.2x)">🎯 聚焦狹縫特寫</button>
           <button id="btn-zoom-reset" class="zoom-btn" title="恢復全景視角">↺ 全景</button>
           <span class="zoom-level-badge" id="zoom-level-text">100%</span>
+          <span class="toolbar-sep-v"></span>
+          <button id="btn-phasebar-mode" class="zoom-btn phase-mode-btn" title="切換狹縫左側柱狀圖模式：光程差 ΔL ↔ 即時波動位移 cos φ">📊 模式: 光程差 ΔL</button>
         </div>
 
         <!-- 底部非遮擋式教學重點浮動橫幅 (避開主要波場與光線路徑) -->
@@ -128,6 +130,9 @@
             <button class="toggle-pill active" id="toggle-pairing" data-layer="pairing">
               <span class="pill-dot"></span> 暗紋配對連線
             </button>
+            <button class="toggle-pill active" id="toggle-phasebars" data-layer="phasebars" title="顯示/隱藏狹縫左側各點到達螢幕相位柱狀圖">
+              <span class="pill-dot"></span> 各點相位柱狀圖
+            </button>
             <button class="toggle-pill active" id="toggle-labels" data-layer="labels">
               <span class="pill-dot"></span> 標示文字
             </button>
@@ -181,14 +186,17 @@
           <button class="preset-btn" id="preset-min1" data-preset="min1">
             2. 第一暗紋 (a sinθ = λ)
           </button>
+          <button class="preset-btn" id="preset-min2" data-preset="min2">
+            3. 第二暗紋 (a sinθ = 2λ)
+          </button>
           <button class="preset-btn" id="preset-max1" data-preset="max1">
-            3. 第一副極大
+            4. 第一副極大
           </button>
           <button class="preset-btn" id="preset-narrow" data-preset="narrow">
-            4. 狹縫變窄
+            5. 狹縫變窄
           </button>
           <button class="preset-btn" id="preset-wide" data-preset="wide">
-            5. 狹縫變寬
+            6. 狹縫變寬
           </button>
         </div>
       </footer>
@@ -206,24 +214,24 @@
         <canvas id="intensity-canvas"></canvas>
       </div>
 
-      <!-- 自由選點子波疊加示波器 (最多4點自由選取，勾選後疊加顯示) -->
+      <!-- 自由選點子波疊加強度分析儀 (最多4點自由選取，顯示疊加光強) -->
       <div class="cancellation-scope-wrap" id="scope-wrap">
         <div class="scope-header">
-          <span class="scope-title">子波疊加示波器</span>
+          <span class="scope-title">子波疊加強度分析儀</span>
           <span class="scope-badge" id="scope-badge">選點觀察</span>
         </div>
 
         <!-- 4個自由選點控制器 -->
         <div class="free-points-panel" id="free-points-panel">
           <div class="free-points-header">
-            <span class="free-points-title">選擇子波點源（最多 4 個，勾選後疊加顯示）</span>
+            <span class="free-points-title">選擇子波點源（最多 4 個，勾選後分析疊加強度）</span>
           </div>
           <div class="free-points-grid" id="free-points-grid">
             <!-- 4個點位控制列，由 JS 動態生成 -->
           </div>
         </div>
 
-        <canvas id="scope-canvas" height="200"></canvas>
+        <canvas id="scope-canvas" height="135"></canvas>
         <div class="scope-legend" id="scope-legend">
           <!-- 圖例將由 JS 動態更新 -->
         </div>
@@ -231,12 +239,12 @@
 
       <!-- 幾何配對分析教學卡片 -->
       <div class="explanation-card" id="explanation-card">
-        <div class="card-title">&#128161; 自由選點疊加解析</div>
+        <div class="card-title">&#128161; 自由選點疊加光強解析</div>
         <p class="card-desc" id="pairing-text">
-          <strong>&#8226; 選取任意子波點源：</strong>可勾選 1～4 個不同位置的點源，觀察其波形與疊加結果。<br>
+          <strong>&#8226; 選取任意子波點源：</strong>可勾選 1～4 個不同位置的點源，觀察其疊加光強與相消情況。<br>
           <strong>&#8226; 光程差決定相位：</strong>兩點間距離 d，到達遠方角度 θ 時，光程差 ΔL = d·sinθ。<br>
-          <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消！<br>
-          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code>，<strong>同相相長</strong>！
+          <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消（疊加光強為 0）！<br>
+          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code> 同相相長；相距 a/4 的兩點光程差為 <code>λ/2</code> 反相相消！
         </p>
       </div>
     </aside>
