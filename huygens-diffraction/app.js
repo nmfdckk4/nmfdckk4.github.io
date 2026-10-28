@@ -50,11 +50,12 @@ const state = {
 
   // 自由選點: 4 個槽位，每個槽位可勾選啟用並自由選擇點源索引
   freePoints: [
-    { enabled: true, idx: 0, color: '#ea00ffff', label: '點 A' },
-    { enabled: true, idx: 8, color: '#fb923c', label: '點 B' },
+    { enabled: false, idx: 0, color: '#ea00ffff', label: '點 A' },
+    { enabled: false, idx: 8, color: '#fb923c', label: '點 B' },
     { enabled: false, idx: 4, color: '#4ade80', label: '點 C' },
     { enabled: false, idx: 12, color: '#c084fc', label: '點 D' },
   ],
+  selectedSlot: -1, // 目前鍵盤焦點的槽位 (-1=無)
 
   // 黑板畫筆標註狀態
   chalkMode: false,
@@ -164,7 +165,7 @@ function resizeCanvases() {
     const scopeRect = scopeCanvas.parentElement.getBoundingClientRect();
     const targetW = Math.max(120, scopeRect.width - 28);
     scopeCanvas.width = targetW * dpr;
-    scopeCanvas.height = 135 * dpr;
+    scopeCanvas.height = 200 * dpr;
     scopeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 }
@@ -460,83 +461,73 @@ function drawWaveScene() {
 }
 
 /**
- * 建立與更新自由選點 UI 控制列 (最多 4 點自由勾選與滑動調整，支援滑鼠點選與鍵盤操作)
+ * 更新自由選點狀態德章列 (取代滑桿面板)
+ * 顯示已選 A/B/C/D 點，點擊切換鍵盤焦點，再次點擊德章即可取消
  */
-function buildFreePointsUI() {
-  const grid = document.getElementById('free-points-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  const N = state.numSources;
-  const COLORS = ['#ea00ffff', '#fb923c', '#4ade80', '#c084fc'];
-  state.freePoints.forEach(function (fp, slotIdx) {
-    fp.color = COLORS[slotIdx];
-    fp.idx = Math.max(0, Math.min(N - 1, fp.idx));
+function buildFreePointsStatus() {
+  const statusEl = document.getElementById('free-points-status');
+  if (!statusEl) return;
+  statusEl.innerHTML = '';
 
-    const row = document.createElement('div');
-    row.className = 'fp-row' + (fp.enabled ? ' fp-enabled' : '');
-    row.style.setProperty('--fp-color', fp.color);
+  const enabledAny = state.freePoints.some(function(fp) { return fp.enabled; });
+  if (!enabledAny) {
+    const empty = document.createElement('span');
+    empty.className = 'fp-status-empty';
+    empty.textContent = '還未選取任何波源點，請點擊左側狹縫中的白色光點';
+    statusEl.appendChild(empty);
+    return;
+  }
 
-    const cbId = 'fp-cb-' + slotIdx;
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.id = cbId;
-    cb.className = 'fp-checkbox';
-    cb.checked = fp.enabled;
-    cb.style.accentColor = fp.color;
-    cb.addEventListener('change', function () {
-      fp.enabled = cb.checked;
-      row.classList.toggle('fp-enabled', fp.enabled);
-      renderSuperpositionScope();
+  state.freePoints.forEach(function(fp, slotIdx) {
+    if (!fp.enabled) return;
+    const badge = document.createElement('div');
+    badge.className = 'fp-status-badge' + (state.selectedSlot === slotIdx ? ' fp-selected-active' : '');
+    badge.style.setProperty('--fp-color', fp.color);
+    badge.title = '點擊切換鍵盤焦點；再次點擊取消選取';
+
+    const dot = document.createElement('span');
+    dot.className = 'fp-status-dot';
+    dot.style.background = fp.color;
+    dot.style.boxShadow = '0 0 6px ' + fp.color;
+
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = fp.label.replace('點 ', '') + ' #' + fp.idx;
+
+    const delBtn = document.createElement('span');
+    delBtn.className = 'fp-status-del';
+    delBtn.textContent = '×';
+    delBtn.title = '取消此點';
+
+    badge.appendChild(dot);
+    badge.appendChild(labelSpan);
+    badge.appendChild(delBtn);
+    statusEl.appendChild(badge);
+
+    badge.addEventListener('click', function(e) {
+      if (e.target === delBtn) return;
+      state.selectedSlot = (state.selectedSlot === slotIdx) ? -1 : slotIdx;
+      buildFreePointsStatus();
     });
 
-    const swatch = document.createElement('span');
-    swatch.className = 'fp-color-swatch';
-    swatch.style.background = fp.color;
-    swatch.style.boxShadow = '0 0 6px ' + fp.color;
-
-    const labelEl = document.createElement('label');
-    labelEl.htmlFor = cbId;
-    labelEl.className = 'fp-label';
-    labelEl.textContent = fp.label;
-    labelEl.style.color = fp.color;
-
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.className = 'touch-slider fp-slider';
-    slider.min = 0;
-    slider.max = N - 1;
-    slider.step = 1;
-    slider.value = fp.idx;
-
-    const valSpan = document.createElement('span');
-    valSpan.className = 'fp-val';
-    valSpan.style.color = fp.color;
-    valSpan.textContent = '#' + fp.idx;
-
-    const onSliderChange = function () {
-      fp.idx = parseInt(slider.value, 10);
-      valSpan.textContent = '#' + fp.idx;
+    delBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      fp.enabled = false;
+      if (state.selectedSlot === slotIdx) state.selectedSlot = -1;
+      buildFreePointsStatus();
       renderSuperpositionScope();
-    };
-
-    slider.addEventListener('input', onSliderChange);
-    slider.addEventListener('change', onSliderChange);
-
-    row.appendChild(cb);
-    row.appendChild(swatch);
-    row.appendChild(labelEl);
-    row.appendChild(slider);
-    row.appendChild(valSpan);
-    grid.appendChild(row);
+    });
   });
 }
 
-function updateFreePointsSliderMax() {
+/**
+ * N 變化後更新自由選點索引範圍
+ */
+function updateFreePointsAfterNChange() {
   const N = state.numSources;
-  state.freePoints.forEach(function (fp) {
+  state.freePoints.forEach(function(fp) {
     fp.idx = Math.max(0, Math.min(N - 1, fp.idx));
   });
-  buildFreePointsUI();
+  buildFreePointsStatus();
 }
 
 /**
@@ -694,6 +685,26 @@ function drawHuygensSources(geom) {
       waveCtx.shadowBlur = 0;
     }
   });
+
+  // 鍵盤焦點選取的槽位：加畫搜動外圈指示環
+  if (state.selectedSlot >= 0) {
+    const selFp = state.freePoints[state.selectedSlot];
+    if (selFp && selFp.enabled) {
+      const selIdx = Math.max(0, Math.min(N - 1, selFp.idx));
+      const selSrc = geom.sources[selIdx];
+      const pulse = 0.5 + 0.5 * Math.sin(state.wavePhase * 2.5);
+      waveCtx.save();
+      waveCtx.beginPath();
+      waveCtx.arc(selSrc.x, selSrc.y, 12 + pulse * 4, 0, Math.PI * 2);
+      waveCtx.strokeStyle = selFp.color;
+      waveCtx.lineWidth = 2.5;
+      waveCtx.globalAlpha = 0.65 + pulse * 0.35;
+      waveCtx.shadowColor = selFp.color;
+      waveCtx.shadowBlur = 16;
+      waveCtx.stroke();
+      waveCtx.restore();
+    }
+  }
 
   waveCtx.restore();
 }
@@ -1689,9 +1700,9 @@ function renderSuperpositionScope() {
   // ==========================================
   // 1. 左側：相量疊加羅盤 (Phasor Vector Dial)
   // ==========================================
-  const dialCx = 56;
-  const dialCy = Math.floor(h * 0.48);
-  const dialR = Math.min(38, Math.floor(h * 0.36));
+  const dialCx = Math.floor(w * 0.22);
+  const dialCy = Math.floor(h * 0.44);
+  const dialR = Math.min(Math.floor(w * 0.19), Math.floor(h * 0.38));
 
   scopeCtx.save();
   // 羅盤背景圓盤
@@ -1795,7 +1806,7 @@ function renderSuperpositionScope() {
   // ==========================================
   // 2. 右側：疊加後光強儀表與數據卡片
   // ==========================================
-  const rightX = 114;
+  const rightX = dialCx * 2 + 18;
   const rightW = w - rightX - 10;
 
   // (A) 頂端標題與百分比
@@ -2058,7 +2069,7 @@ function animationLoop() {
  * 綁定黑板觸控、滑鼠拖拉平移與介面互動事件
  */
 function initEvents() {
-  buildFreePointsUI();
+  buildFreePointsStatus();
   // 1. 播放 / 暫停
   btnPlayPause.addEventListener('click', () => {
     state.isPlaying = !state.isPlaying;
@@ -2200,7 +2211,7 @@ function initEvents() {
   sliderN.addEventListener('input', (e) => {
     state.numSources = parseInt(e.target.value, 10);
     valN.textContent = `${state.numSources} 個點`;
-    updateFreePointsSliderMax();
+    updateFreePointsAfterNChange();
     updateMetrics();
     renderScreenDisplays();
   });
@@ -2229,21 +2240,40 @@ function initEvents() {
     const worldY = (y - state.panY) / state.zoom;
     const geom = getSlitGeometry(rect.width, rect.height);
 
-    // 點擊柱狀圖條：將點設為自由選點 A，方便立刻在示波器觀察
-    if (state.layers.phasebars && state.hoveredBarIdx >= 0 && geom.sources.length > 0) {
-      const slitX = geom.slitX;
-      const chartRight = slitX - 24;
-      const chartW = Math.min(115, Math.max(76, slitX * 0.48));
-      const chartLeft = chartRight - chartW;
-      const boxLeft = chartLeft - 16;
-      const boxRight = chartRight + 12;
-      if (worldX >= boxLeft && worldX <= boxRight) {
-        if (state.freePoints && state.freePoints[0]) {
-          state.freePoints[0].idx = state.hoveredBarIdx;
-          state.freePoints[0].enabled = true;
-          buildFreePointsUI();
-          renderSuperpositionScope();
+    // 點擊狹縫中的惠更斯點波源 => 選取/取消 A/B/C/D
+    const srcN = geom.sources.length;
+    if (!state.chalkMode && srcN > 0) {
+      const hitR = Math.max(12, state.slitWidth / srcN * 0.9);
+      let clickedSrcIdx = -1;
+      for (let si = 0; si < srcN; si++) {
+        const src = geom.sources[si];
+        if (Math.hypot(worldX - src.x, worldY - src.y) < hitR) {
+          clickedSrcIdx = si;
+          break;
         }
+      }
+      if (clickedSrcIdx >= 0) {
+        const alreadySlot = state.freePoints.findIndex(function(fp) { return fp.enabled && fp.idx === clickedSrcIdx; });
+        if (alreadySlot >= 0) {
+          state.selectedSlot = (state.selectedSlot === alreadySlot) ? -1 : alreadySlot;
+          if (state.selectedSlot < 0) {
+            state.freePoints[alreadySlot].enabled = false;
+          }
+        } else {
+          const emptySlot = state.freePoints.findIndex(function(fp) { return !fp.enabled; });
+          if (emptySlot >= 0) {
+            state.freePoints[emptySlot].enabled = true;
+            state.freePoints[emptySlot].idx = clickedSrcIdx;
+            state.selectedSlot = emptySlot;
+          } else {
+            const overwriteSlot = state.selectedSlot >= 0 ? state.selectedSlot : 0;
+            state.freePoints[overwriteSlot].idx = clickedSrcIdx;
+            state.selectedSlot = overwriteSlot;
+          }
+        }
+        buildFreePointsStatus();
+        renderSuperpositionScope();
+        return;
       }
     }
 
@@ -2326,7 +2356,21 @@ function initEvents() {
         state.hoveredBarIdx = -1;
       }
 
-      if (foundBar) {
+      // 檢查是否悬停在狹縫波源上
+      let foundSource = false;
+      if (!foundBar && geom.sources.length > 0) {
+        const hitR2 = Math.max(12, state.slitWidth / geom.sources.length * 0.9);
+        for (let si = 0; si < geom.sources.length; si++) {
+          const src2 = geom.sources[si];
+          if (Math.hypot(worldX - src2.x, worldY - src2.y) < hitR2) {
+            simContainer.style.cursor = 'pointer';
+            foundSource = true;
+            break;
+          }
+        }
+      }
+
+      if (foundBar || foundSource) {
         // 保持 pointer 游標
       } else if (Math.hypot(worldX - handleX, worldY - handleY) < 36) {
         simContainer.style.cursor = 'pointer';
@@ -2541,6 +2585,53 @@ function initEvents() {
     }, { passive: false });
     window.addEventListener('touchend', stopDraw);
   }
+
+  // 11. 鍵盤 ↑↓ 移動選取點位置 / Del 取消 / Tab 切換焦點
+  document.addEventListener('keydown', function(e) {
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+    const slot = state.selectedSlot;
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (slot < 0) return;
+      e.preventDefault();
+      const fp = state.freePoints[slot];
+      if (!fp || !fp.enabled) return;
+      const N = state.numSources;
+      fp.idx = (e.key === 'ArrowUp') ? Math.max(0, fp.idx - 1) : Math.min(N - 1, fp.idx + 1);
+      buildFreePointsStatus();
+      renderSuperpositionScope();
+      return;
+    }
+
+    if (e.key === 'Delete') {
+      if (slot < 0) return;
+      e.preventDefault();
+      state.freePoints[slot].enabled = false;
+      state.selectedSlot = -1;
+      buildFreePointsStatus();
+      renderSuperpositionScope();
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      const enabledSlots = [];
+      state.freePoints.forEach(function(fp, i) { if (fp.enabled) enabledSlots.push(i); });
+      if (enabledSlots.length === 0) return;
+      e.preventDefault();
+      const curIdx = enabledSlots.indexOf(slot);
+      state.selectedSlot = e.shiftKey
+        ? enabledSlots[(curIdx - 1 + enabledSlots.length) % enabledSlots.length]
+        : enabledSlots[(curIdx + 1) % enabledSlots.length];
+      buildFreePointsStatus();
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      state.selectedSlot = -1;
+      buildFreePointsStatus();
+    }
+  });
 
   // 初始化完成
 }

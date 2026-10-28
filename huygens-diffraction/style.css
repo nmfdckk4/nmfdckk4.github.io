@@ -336,108 +336,113 @@ html, body {
   border-color: rgba(250, 204, 21, 0.5);
 }
 
-/* 自由選點面板 */
-.free-points-panel {
-  background: rgba(15, 23, 42, 0.85);
-  border: 1.5px solid rgba(56, 189, 248, 0.3);
-  border-radius: 10px;
-  padding: 8px 12px;
+/* 已選點狀態列 (取代滑桿面板) */
+.free-points-status {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-  pointer-events: auto !important;
-}
-
-.free-points-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2px;
-}
-
-.free-points-title {
-  font-size: 0.84rem;
-  font-weight: 700;
-  color: #94a3b8;
-}
-
-/* 每個選點列 */
-.free-points-grid {
-  display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 6px;
-  pointer-events: auto !important;
-}
-
-.fp-row {
-  display: flex;
+  min-height: 28px;
   align-items: center;
-  gap: 8px;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1.5px solid transparent;
-  border-radius: 8px;
-  padding: 5px 10px;
-  transition: border-color 0.15s ease, background 0.15s ease;
-  pointer-events: auto !important;
-  user-select: auto !important;
-  -webkit-user-select: auto !important;
 }
 
-.fp-row.fp-enabled {
-  border-color: var(--fp-color, rgba(56,189,248,0.5));
-  background: rgba(30, 41, 59, 0.95);
-}
-
-.fp-checkbox {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--fp-color, var(--accent-cyan));
-  flex-shrink: 0;
-  pointer-events: auto !important;
-}
-
-.fp-color-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px var(--fp-color, #00f2fe);
-}
-
-.fp-label {
+/* 每個已選點的徽章 */
+.fp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 20px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #cbd5e1;
-  min-width: 28px;
+  cursor: pointer;
+  border: 1.5px solid var(--fp-color, rgba(56,189,248,0.5));
+  background: rgba(30, 41, 59, 0.85);
+  color: var(--fp-color, #38bdf8);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.fp-status-badge:hover {
+  background: rgba(30, 41, 59, 1);
+  filter: brightness(1.2);
+}
+
+.fp-status-badge.fp-selected-active {
+  box-shadow: 0 0 10px var(--fp-color, rgba(56,189,248,0.5));
+  background: rgba(30, 41, 59, 1);
+}
+
+.fp-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--fp-color, #38bdf8);
+  box-shadow: 0 0 6px var(--fp-color, #38bdf8);
   flex-shrink: 0;
-  cursor: pointer;
-  pointer-events: auto !important;
-  user-select: auto !important;
 }
 
-.fp-slider {
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-  pointer-events: auto !important;
-  touch-action: pan-x !important;
+.fp-status-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+  font-size: 0.65rem;
+  margin-left: 2px;
+  color: rgba(255,255,255,0.6);
+  transition: background 0.1s;
+}
+.fp-status-badge:hover .fp-status-del {
+  background: rgba(244, 63, 94, 0.5);
+  color: #fff;
 }
 
-.fp-val {
-  font-family: var(--font-mono);
+/* 空狀態提示 */
+.fp-status-empty {
   font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--fp-color, var(--accent-cyan));
-  min-width: 44px;
-  text-align: right;
+  color: #475569;
+  font-style: italic;
+}
+
+/* 操作說明提示 */
+.point-select-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: rgba(56, 189, 248, 0.06);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: 8px;
+}
+
+.hint-icon {
+  font-size: 0.9rem;
   flex-shrink: 0;
-  user-select: auto !important;
+}
+
+.hint-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.hint-text kbd {
+  display: inline-block;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 3px;
+  padding: 0px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 0 1px;
 }
 
 #scope-canvas {
   width: 100%;
-  height: 135px;
+  height: 200px;
   border-radius: 8px;
   background: #040812;
   border: 1px solid #1e293b;

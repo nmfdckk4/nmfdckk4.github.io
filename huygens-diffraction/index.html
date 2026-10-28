@@ -168,24 +168,25 @@
         <canvas id="intensity-canvas"></canvas>
       </div>
 
-      <!-- 自由選點子波疊加強度分析儀 (最多4點自由選取，顯示疊加光強) -->
+      <!-- 自由選點子波疊加強度分析儀 (點選波源選取，不再用滑桿) -->
       <div class="cancellation-scope-wrap" id="scope-wrap">
         <div class="scope-header">
           <span class="scope-title">在P處之相位疊加分析儀</span>
           <span class="scope-badge" id="scope-badge">選點觀察</span>
         </div>
 
-        <!-- 4個自由選點控制器 -->
-        <div class="free-points-panel" id="free-points-panel">
-          <div class="free-points-header">
-            <span class="free-points-title">選擇子波點源（最多 4 個，勾選後分析疊加強度）</span>
-          </div>
-          <div class="free-points-grid" id="free-points-grid">
-            <!-- 4個點位控制列，由 JS 動態生成 -->
-          </div>
+        <!-- 已選點狀態列 -->
+        <div class="free-points-status" id="free-points-status">
+          <!-- 由 JS 動態生成選點狀態徽章 -->
         </div>
 
-        <canvas id="scope-canvas" height="135"></canvas>
+        <!-- 操作說明提示 -->
+        <div class="point-select-hint">
+          <span class="hint-icon">👆</span>
+          <span class="hint-text">點擊狹縫波源選取 A/B/C/D；選取後 <kbd>↑</kbd><kbd>↓</kbd> 移動，<kbd>Del</kbd> 取消</span>
+        </div>
+
+        <canvas id="scope-canvas" height="200"></canvas>
         <div class="scope-legend" id="scope-legend">
           <!-- 圖例將由 JS 動態更新 -->
         </div>
@@ -195,11 +196,10 @@
       <div class="explanation-card" id="explanation-card">
         <div class="card-title">&#128161; 自由選點疊加光強解析</div>
         <p class="card-desc" id="pairing-text">
-          <strong>&#8226; 選取任意子波點源：</strong>可勾選 1～4 個不同位置的點源，觀察其疊加光強與相消情況。<br>
+          <strong>&#8226; 點擊狹縫波源選取：</strong>直接點擊左側畫面的波源點 (最多 4 個 A/B/C/D)，觀察疊加光強。<br>
+          <strong>&#8226; 鍵盤精確調整：</strong>選取點後用 <kbd style="background:#1e293b;border:1px solid #334155;padding:1px 5px;border-radius:3px;">↑↓</kbd> 鍵移動波源位置。<br>
           <strong>&#8226; 光程差決定相位：</strong>兩點間距離 d，到達遠方角度 θ 時，光程差 ΔL = d·sinθ。<br>
-          <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消（疊加光強為 0）！<br>
-          <strong>&#8226; 第二暗紋 (a·sinθ = 2λ)：</strong>相距 a/2 的兩點光程差為 <code>λ</code> 同相相長；相距 a/4 的兩點光程差為 <code>λ/2</code>
-          反相相消！
+          <strong>&#8226; 第一暗紋條件 (a·sinθ = λ)：</strong>相距 a/2 的兩點光程差恰好為 <code>λ/2</code>，反相相消！
         </p>
       </div>
     </aside>
