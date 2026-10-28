@@ -469,7 +469,7 @@ function buildFreePointsStatus() {
   if (!statusEl) return;
   statusEl.innerHTML = '';
 
-  const enabledAny = state.freePoints.some(function(fp) { return fp.enabled; });
+  const enabledAny = state.freePoints.some(function (fp) { return fp.enabled; });
   if (!enabledAny) {
     const empty = document.createElement('span');
     empty.className = 'fp-status-empty';
@@ -478,7 +478,7 @@ function buildFreePointsStatus() {
     return;
   }
 
-  state.freePoints.forEach(function(fp, slotIdx) {
+  state.freePoints.forEach(function (fp, slotIdx) {
     if (!fp.enabled) return;
     const badge = document.createElement('div');
     badge.className = 'fp-status-badge' + (state.selectedSlot === slotIdx ? ' fp-selected-active' : '');
@@ -503,13 +503,13 @@ function buildFreePointsStatus() {
     badge.appendChild(delBtn);
     statusEl.appendChild(badge);
 
-    badge.addEventListener('click', function(e) {
+    badge.addEventListener('click', function (e) {
       if (e.target === delBtn) return;
       state.selectedSlot = (state.selectedSlot === slotIdx) ? -1 : slotIdx;
       buildFreePointsStatus();
     });
 
-    delBtn.addEventListener('click', function(e) {
+    delBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       fp.enabled = false;
       if (state.selectedSlot === slotIdx) state.selectedSlot = -1;
@@ -524,7 +524,7 @@ function buildFreePointsStatus() {
  */
 function updateFreePointsAfterNChange() {
   const N = state.numSources;
-  state.freePoints.forEach(function(fp) {
+  state.freePoints.forEach(function (fp) {
     fp.idx = Math.max(0, Math.min(N - 1, fp.idx));
   });
   buildFreePointsStatus();
@@ -664,7 +664,8 @@ function drawHuygensSources(geom) {
       }
     } else {
       // 未勾選的普通點波源：較小實心核心 + 半透明外層 (折衷清晰度與波前連續感)
-      // 依點距動態自適應核心半徑，即使 N=32 點源極多時也不會沾黏成整條白塊
+      // 依點距動態自適應核心半徑，即使 N=32 
+      // 極多時也不會沾黏成整條白塊
       const coreR = Math.max(1.1, Math.min(2.0, spacing * 0.25));
       const haloR = Math.max(2.6, Math.min(5.5, spacing * 0.65));
 
@@ -827,7 +828,7 @@ function drawRaysAndPathDiff(geom, w, h) {
       waveCtx.restore();
 
       const diffLambda = (pathDiff / state.wavelength).toFixed(2);
-      drawTextBadge(waveCtx, `總光程差 ΔL = a·sinθ (${diffLambda} λ)`, badgeX, badgeY, {
+      drawTextBadge(waveCtx, `最大光程差 ΔL = a·sinθ (${diffLambda} λ)`, badgeX, badgeY, {
         textColor: '#fda4af',
         borderColor: '#f43f5e',
         borderWidth: 2,
@@ -1449,7 +1450,7 @@ function drawPhaseBarChart(geom, w, h) {
     waveCtx.fillText('★ 中央極大 (同相)', boxLeft + 8, bottomTextY);
   } else {
     waveCtx.fillStyle = '#94a3b8';
-    waveCtx.fillText(`跨度: ${maxPathLambda.toFixed(2)}λ`, boxLeft + 8, bottomTextY);
+    waveCtx.fillText(`最大光程差: ${maxPathLambda.toFixed(2)}λ`, boxLeft + 8, bottomTextY);
   }
 
   waveCtx.restore();
@@ -1466,14 +1467,14 @@ function updateBottomBanner(isNearMin1, isNearMin2) {
     bannerBadge.style.background = 'rgba(0, 242, 254, 0.25)';
     bannerBadge.style.borderColor = 'rgba(0, 242, 254, 0.6)';
     bannerBadge.style.color = '#00f2fe';
-    bannerText.innerHTML = '<strong>相距 a/2 配對：</strong>光程差 <code>ΔL = (a/2)·sinθ = λ/2</code> ⇒ 上下半部對應點反相 180° 完全相消！';
+    bannerText.innerHTML = '<strong>相距 a/2 配對：</strong>最大光程差 <code>ΔL = (a/2)·sinθ = λ/2</code> ⇒ 上下半部對應點反相 180° 完全相消！';
   } else if (isNearMin2) {
     bottomHudBanner.style.display = 'flex';
     bannerBadge.textContent = '★ 第二暗紋 (a/4 配對相消)';
     bannerBadge.style.background = 'rgba(244, 63, 94, 0.25)';
     bannerBadge.style.borderColor = 'rgba(244, 63, 94, 0.6)';
     bannerBadge.style.color = '#fda4af';
-    bannerText.innerHTML = '<strong>狹縫四等分 (相距 a/4)：</strong>總光程差 <code>2λ</code>，相距 <code>a/4</code> 之對應點光程差恰為 <code>(a/4)·sinθ = λ/2</code> ⇒ 兩兩反相抵銷！';
+    bannerText.innerHTML = '<strong>狹縫四等分 (相距 a/4)：</strong>最大光程差 <code>2λ</code>，相距 <code>a/4</code> 之對應點光程差恰為 <code>(a/4)·sinθ = λ/2</code> ⇒ 兩兩反相抵銷！';
   } else {
     bottomHudBanner.style.display = 'none';
   }
@@ -2253,14 +2254,14 @@ function initEvents() {
         }
       }
       if (clickedSrcIdx >= 0) {
-        const alreadySlot = state.freePoints.findIndex(function(fp) { return fp.enabled && fp.idx === clickedSrcIdx; });
+        const alreadySlot = state.freePoints.findIndex(function (fp) { return fp.enabled && fp.idx === clickedSrcIdx; });
         if (alreadySlot >= 0) {
           state.selectedSlot = (state.selectedSlot === alreadySlot) ? -1 : alreadySlot;
           if (state.selectedSlot < 0) {
             state.freePoints[alreadySlot].enabled = false;
           }
         } else {
-          const emptySlot = state.freePoints.findIndex(function(fp) { return !fp.enabled; });
+          const emptySlot = state.freePoints.findIndex(function (fp) { return !fp.enabled; });
           if (emptySlot >= 0) {
             state.freePoints[emptySlot].enabled = true;
             state.freePoints[emptySlot].idx = clickedSrcIdx;
@@ -2587,7 +2588,7 @@ function initEvents() {
   }
 
   // 11. 鍵盤 ↑↓ 移動選取點位置 / Del 取消 / Tab 切換焦點
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
     const slot = state.selectedSlot;
@@ -2616,7 +2617,7 @@ function initEvents() {
 
     if (e.key === 'Tab') {
       const enabledSlots = [];
-      state.freePoints.forEach(function(fp, i) { if (fp.enabled) enabledSlots.push(i); });
+      state.freePoints.forEach(function (fp, i) { if (fp.enabled) enabledSlots.push(i); });
       if (enabledSlots.length === 0) return;
       e.preventDefault();
       const curIdx = enabledSlots.indexOf(slot);
