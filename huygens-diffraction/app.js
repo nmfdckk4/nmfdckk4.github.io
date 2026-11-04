@@ -514,7 +514,7 @@ function buildFreePointsStatus() {
       fp.enabled = false;
       if (state.selectedSlot === slotIdx) state.selectedSlot = -1;
       buildFreePointsStatus();
-      renderSuperpositionScope();
+      _scopeLastPhase = -99999; renderSuperpositionScope();
     });
   });
 }
@@ -582,8 +582,8 @@ function drawHuygensSources(geom) {
   });
 
   // 左側呼出標籤繪製器 (引線 + 高對比黑底彩框徽章 + 清楚亮白文字)
-  function drawLeftCallout(fromX, fromY, col, label, fillColor, lineColor, badgeW) {
-    const ly = fromY;
+  function drawLeftCallout(fromX, fromY, col, label, fillColor, lineColor, badgeW, offsetY = 0) {
+    const ly = fromY + offsetY;
     waveCtx.save();
     waveCtx.shadowBlur = 0;
 
@@ -657,10 +657,13 @@ function drawHuygensSources(geom) {
       waveCtx.shadowBlur = 0;
       waveCtx.fill();
 
-      // 4. 勾選點呼出標籤 (A, B, C, D) 標註於狹縫左側 (若相位柱狀圖開啟，則直接整合於柱狀圖內以避免重疊)
+      // 4. 勾選點呼出標籤 (A, B, C, D) 標註於狹縫左側
       if (state.layers.labels && !state.layers.phasebars) {
         const col = geom.slitX - 52 - (slotIdx % 2) * 40;
-        drawLeftCallout(src.x, src.y, col, label, dotColor, dotColor, 32);
+        // 垂直防碰撞：波源間践小時，根據槽位交錯偏移標籤
+        const badgeH = 26;
+        const offsetY = spacing < badgeH * 1.2 ? (slotIdx % 2 === 0 ? -badgeH * 0.6 : badgeH * 0.6) : 0;
+        drawLeftCallout(src.x, src.y, col, label, dotColor, dotColor, 32, offsetY);
       }
     } else {
       // 未勾選的普通點波源：較小實心核心 + 半透明外層 (折衷清晰度與波前連續感)
@@ -714,9 +717,11 @@ function drawHuygensSources(geom) {
  * 繪製觀測光線、等相位面與角度旋轉把手 (防重疊安全佈局)
  */
 function drawRaysAndPathDiff(geom, w, h) {
+  // CCW+约定：顯示角為逆時針正，幾何畫布用 geomRad = -thetaRad
   const thetaRad = (state.thetaDeg * Math.PI) / 180;
-  const cosT = Math.cos(thetaRad);
-  const sinT = Math.sin(thetaRad);
+  const geomRad = -thetaRad;
+  const cosT = Math.cos(geomRad);
+  const sinT = Math.sin(geomRad);
   const rayLen = Math.min(w * 0.65, 480);
 
   waveCtx.save();
@@ -778,8 +783,8 @@ function drawRaysAndPathDiff(geom, w, h) {
   //   因此：波前垂線從領先的 topSrc 連到底端光線上；額外光程差高亮段位於底端光線 (botSrc) 上！
   const topSrc = geom.sources[0];
   const botSrc = geom.sources[geom.sources.length - 1];
-  const lagSrc = thetaRad >= 0 ? topSrc : botSrc;   // 需多走光程的光線 (落後波)
-  const leadSrc = thetaRad >= 0 ? botSrc : topSrc;  // 較早到達的波前基準點 (領先波)
+  const lagSrc = geomRad >= 0 ? topSrc : botSrc;   // 需多走光程的光線 (落後波)
+  const leadSrc = geomRad >= 0 ? botSrc : topSrc;  // 較早到達的波前基準點 (領先波)
   const pathDiff = Math.abs(state.slitWidth * sinT);
 
   // 垂足坐標 (位於落後光線上)
@@ -808,11 +813,11 @@ function drawRaysAndPathDiff(geom, w, h) {
     const midDiffY = lagSrc.y + (pathDiff * sinT) * 0.5;
     let badgeX = midDiffX + 24;
     // 當 θ >= 0 時落後光線為 topSrc (頂端)，標籤朝上方外側 (-38)；當 θ < 0 時為 botSrc (底端)，標籤朝下方外側 (+38)
-    let badgeY = midDiffY + (thetaRad >= 0 ? -38 : 38);
+    let badgeY = midDiffY + (geomRad >= 0 ? -38 : 38);
 
     // 防重疊檢測：若與「⟲ 調角度」把手顯示框接近，加大垂直避讓
     if (Math.abs(badgeX - handleX) < 190 && Math.abs(badgeY - handleY) < 55) {
-      badgeY = midDiffY + (thetaRad >= 0 ? -68 : 68);
+      badgeY = midDiffY + (geomRad >= 0 ? -68 : 68);
     }
 
     if (state.layers.labels) {
@@ -848,11 +853,11 @@ function drawRaysAndPathDiff(geom, w, h) {
     waveCtx.strokeStyle = '#facc15';
     waveCtx.lineWidth = 2.4;
     waveCtx.beginPath();
-    waveCtx.arc(geom.slitX, geom.centerY, arcRadius, 0, thetaRad, thetaRad < 0);
+    waveCtx.arc(geom.slitX, geom.centerY, arcRadius, 0, geomRad, geomRad < 0);
     waveCtx.stroke();
 
     if (state.layers.labels) {
-      const labelAngle = thetaRad * 0.5;
+      const labelAngle = geomRad * 0.5;
       const labelR = arcRadius + 28;
       const badgeX = geom.slitX + labelR * Math.cos(labelAngle);
       const badgeY = geom.centerY + labelR * Math.sin(labelAngle);
@@ -900,8 +905,9 @@ function drawRaysAndPathDiff(geom, w, h) {
 function drawPairingLines(geom) {
   if (!state.layers.pairing) return;
   const thetaRad = (state.thetaDeg * Math.PI) / 180;
-  const cosT = Math.cos(thetaRad);
-  const sinT = Math.sin(thetaRad);
+  const geomRad = -thetaRad; // CCW+
+  const cosT = Math.cos(geomRad);
+  const sinT = Math.sin(geomRad);
   if (Math.abs(sinT) < 1e-4) return;
 
   const enabled = state.freePoints.filter(fp => fp.enabled);
@@ -942,8 +948,8 @@ function drawPairingLines(geom) {
   const topSrc = srcA.y < srcB.y ? srcA : srcB;
   const botSrc = srcA.y < srcB.y ? srcB : srcA;
   // 同理：θ >= 0 時頂端光線 (topSrc) 需多走額外光程；θ < 0 時底端光線 (botSrc) 需多走額外光程
-  const lagSrc = thetaRad >= 0 ? topSrc : botSrc;
-  const leadSrc = thetaRad >= 0 ? botSrc : topSrc;
+  const lagSrc = geomRad >= 0 ? topSrc : botSrc;
+  const leadSrc = geomRad >= 0 ? botSrc : topSrc;
 
   // 垂足坐標 (位於落後光線上)
   const footX = lagSrc.x + dl * cosT;
@@ -982,13 +988,13 @@ function drawPairingLines(geom) {
     const midY = lagSrc.y + (dl * sinT) * 0.5;
     let badgeX = midX + 24;
     // 配對標籤朝向兩射線之間 (內側) 展開，自然與朝外側的總光程差標籤錯開！
-    let badgeY = midY + (thetaRad >= 0 ? 32 : -32);
+    let badgeY = midY + (geomRad >= 0 ? 32 : -32);
 
     // 主動防碰撞檢查：如果與「總光程差標籤」在畫面上有任何重疊風險，主動往反方向安全推開
     if (state.lastPathDiffBadge) {
       const pd = state.lastPathDiffBadge;
       if (Math.abs(badgeX - pd.x) < 220 && Math.abs(badgeY - pd.y) < 44) {
-        badgeY = (thetaRad >= 0) ? pd.y + 48 : pd.y - 48;
+        badgeY = (geomRad >= 0) ? pd.y + 48 : pd.y - 48;
       }
     }
 
@@ -1026,7 +1032,8 @@ function drawPhaseBarChart(geom, w, h) {
   if (N === 0) return;
 
   const thetaRad = (state.thetaDeg * Math.PI) / 180;
-  const sinT = Math.sin(thetaRad);
+  const geomRad = -thetaRad; // CCW+
+  const sinT = Math.sin(geomRad);
   const absSinT = Math.abs(sinT);
   const k = (2 * Math.PI) / state.wavelength;
 
@@ -1038,7 +1045,7 @@ function drawPhaseBarChart(geom, w, h) {
   // 當 θ < 0 時 (光線朝右上射出)，頂端點最靠近螢幕 (領先，ΔL = 0)，底端點需多走 a·|sinθ| 光程
   const pointData = sources.map((src, idx) => {
     let extraPath = 0;
-    if (thetaRad >= 0) {
+    if (geomRad >= 0) {
       extraPath = (botY - src.y) * sinT;
     } else {
       extraPath = (src.y - topY) * absSinT;
@@ -1224,27 +1231,39 @@ function drawPhaseBarChart(geom, w, h) {
   const barH = Math.max(2.4, Math.min(8.0, spacing * 0.68));
 
   // 互補色彩計算工具：相差 180° (半波長) 呈現互補色對 (青藍 ↔ 珊瑚粉紅，翠綠 ↔ 紫羅蘭)
+  // 灰階相位色：0λ=最亮(白), 0.5λ=最暗(深灰,相消干涉), 1λ=再白
   function getPhaseColor(cycle, alpha = 1.0) {
-    const hue = ((cycle * 360 + 190) % 360).toFixed(0);
-    return `hsla(${hue}, 95%, 58%, ${alpha})`;
+    const lum = Math.round(28 + 56 * (0.5 + 0.5 * Math.cos(cycle * 2 * Math.PI)));
+    return `hsla(0, 0%, ${lum}%, ${alpha})`;
   }
 
-  // 計算當前是否有懸停點，並找出與其相位差最接近 180° (0.50λ) 的相消夥伴
+  // 計算當前是否有懸停點，並依惠更斯繞射「半波長等分區 (λ/2 zone)」找出對應相消夥伴
+  // 單狹縫繞射中，相消干涉是將狹縫按 λ/2 光程差等分為 2m 區：
+  // 第 1 區與第 2 區配對 (ΔL = λ/2)，第 3 區與第 4 區配對 (ΔL = λ/2)...
   let hoveredPartnerIdx = -1;
   let hoveredIsDestructive = false;
   if (state.hoveredBarIdx >= 0 && state.hoveredBarIdx < N) {
     const hData = pointData[state.hoveredBarIdx];
+    const p = hData.pathLambda;
+    // 判斷當前點落在第幾個 λ/2 分區 (Zone 0, Zone 1, Zone 2...)
+    const zone = Math.floor(p / 0.5);
+    // 偶數區 (0, 2, 4...) 與其下一區 (1, 3, 5...) 配對，反之亦然
+    const targetP = (zone % 2 === 0) ? p + 0.5 : p - 0.5;
+
+    let bestIdx = -1;
     let minErr = 999;
     for (let j = 0; j < N; j++) {
       if (j === state.hoveredBarIdx) continue;
-      const diff = Math.abs(pointData[j].pathLambda - hData.pathLambda);
-      const mHalf = Math.floor(diff) + 0.5;
-      const err = Math.abs(diff - mHalf);
-      if (err < minErr && diff > 0.05) {
+      const err = Math.abs(pointData[j].pathLambda - targetP);
+      if (err < minErr) {
         minErr = err;
-        hoveredPartnerIdx = j;
-        hoveredIsDestructive = (err < 0.12);
+        bestIdx = j;
       }
+    }
+
+    if (bestIdx >= 0 && minErr < 0.15) {
+      hoveredPartnerIdx = bestIdx;
+      hoveredIsDestructive = true;
     }
   }
 
@@ -1327,70 +1346,20 @@ function drawPhaseBarChart(geom, w, h) {
     }
   });
 
-  // 6. 相消配對視覺化 (對應相消的可能性)
+  // 6. 柱狀圖左側配對虛線已移除，減少視覺幹擾
   const halfN = Math.floor(N / 2);
-  const quarterN = Math.floor(N / 4);
-  const isNearMin1 = Math.abs(maxPathLambda - 1.0) < 0.15;
-  const isNearMin2 = Math.abs(maxPathLambda - 2.0) < 0.15;
 
-  if (isNearMin1 && N >= 6) {
-    waveCtx.save();
-    // 第一暗紋：狹縫上下兩半部 (相距 a/2) 普遍反相配對 (光程差 λ/2)
-    const pairsToShow = [
-      { i: 0, j: halfN },
-      { i: Math.max(1, Math.floor(halfN * 0.4)), j: Math.max(1, Math.floor(halfN * 0.4)) + halfN }
-    ];
-
-    pairsToShow.forEach(pair => {
-      if (pair.i < N && pair.j < N) {
-        const sA = sources[pair.i];
-        const sB = sources[pair.j];
-
-        waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
-        waveCtx.lineWidth = 1.5;
-        waveCtx.setLineDash([3, 2]);
-
-        waveCtx.beginPath();
-        waveCtx.moveTo(chartLeft - 4, sA.y);
-        waveCtx.bezierCurveTo(chartLeft - 18, sA.y, chartLeft - 18, sB.y, chartLeft - 4, sB.y);
-        waveCtx.stroke();
-      }
-    });
-    waveCtx.setLineDash([]);
-    waveCtx.restore();
-  } else if (isNearMin2 && N >= 8 && quarterN >= 1) {
-    waveCtx.save();
-    // 第二暗紋：狹縫四等分 (相距 a/4) 普遍反相配對 (光程差 λ/2)
-    const pairsToShow2 = [
-      { i: 0, j: quarterN },
-      { i: halfN, j: halfN + quarterN }
-    ];
-
-    pairsToShow2.forEach(pair => {
-      if (pair.i < N && pair.j < N) {
-        const sA = sources[pair.i];
-        const sB = sources[pair.j];
-
-        waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
-        waveCtx.lineWidth = 1.5;
-        waveCtx.setLineDash([3, 2]);
-
-        waveCtx.beginPath();
-        waveCtx.moveTo(chartLeft - 4, sA.y);
-        waveCtx.bezierCurveTo(chartLeft - 18, sA.y, chartLeft - 18, sB.y, chartLeft - 4, sB.y);
-        waveCtx.stroke();
-      }
-    });
-    waveCtx.setLineDash([]);
-    waveCtx.restore();
-  }
-
-  // 7. 若滑鼠正在懸停某個柱狀條，顯示精準相位數值與相消對照 Tooltip
+  // 7. 若滑鼠正在懸停某個柱狀條，顯示精準相位數值與相消對照 Tooltip (含徽章智慧垂相防重疊)
   if (state.hoveredBarIdx >= 0 && state.hoveredBarIdx < N) {
     const hData = pointData[state.hoveredBarIdx];
     waveCtx.save();
 
-    // 繪製該點與相消點的連結弧線
+    const tipX = boxLeft - 8;
+    const tipY = hData.src.y;
+    const badgeH = 26;
+    const requiredSep = badgeH + 4; // 兩徽章中心點至少間隔 30px，確保不重疊
+
+    // 繪製該點與相消點的連結弧線及相消徽章
     if (hoveredPartnerIdx >= 0 && hoveredIsDestructive) {
       const sA = hData.src;
       const sB = sources[hoveredPartnerIdx];
@@ -1401,9 +1370,32 @@ function drawPhaseBarChart(geom, w, h) {
       waveCtx.bezierCurveTo(chartLeft - 22, sA.y, chartLeft - 22, sB.y, chartLeft - 4, sB.y);
       waveCtx.stroke();
 
-      // 在弧頂標註相消徽章 (靠左對齊，遠離狹縫擋板)
-      const midY = (sA.y + sB.y) * 0.5;
-      drawTextBadge(waveCtx, '反相相消 (ΔL = 0.5λ)', chartLeft - 24, midY, {
+      // 在弧頂標註相消徽章：智慧防重疊計算
+      // 根據配對點位於上方或下方，自然將相消徽章朝開口內部展開，並強制與點標籤保持安全垂相間隔
+      const naturalMidY = (sA.y + sB.y) * 0.5;
+      let antiY = naturalMidY;
+      if (sB.y >= sA.y) {
+        // 配對點在下方：相消徽章配置在點標籤下方，至少間隔 requiredSep
+        antiY = Math.max(naturalMidY, tipY + requiredSep);
+      } else {
+        // 配對點在上方：相消徽章配置在點標籤上方，至少間隔 requiredSep
+        antiY = Math.min(naturalMidY, tipY - requiredSep);
+      }
+
+      // 若相消徽章因避讓而位移，繪製細虛線引線連回弧頂中央，保持視覺連結
+      if (Math.abs(antiY - naturalMidY) > 2) {
+        waveCtx.save();
+        waveCtx.strokeStyle = 'rgba(244, 63, 94, 0.55)';
+        waveCtx.lineWidth = 1.2;
+        waveCtx.setLineDash([2, 2]);
+        waveCtx.beginPath();
+        waveCtx.moveTo(chartLeft - 22, naturalMidY);
+        waveCtx.lineTo(chartLeft - 24, antiY);
+        waveCtx.stroke();
+        waveCtx.restore();
+      }
+
+      drawTextBadge(waveCtx, '反相相消 (ΔL = 0.5λ)', chartLeft - 24, antiY, {
         textColor: '#fda4af',
         borderColor: '#f43f5e',
         borderWidth: 1.5,
@@ -1413,11 +1405,9 @@ function drawPhaseBarChart(geom, w, h) {
       });
     }
 
-    // 柱狀圖左側懸浮標籤 (置於 boxLeft - 8 靠右對齊，指向左側寬敞區域，永不與狹縫擋板重疊)
-    const phaseValStr = `${hData.pathLambda.toFixed(2)}λ (${hData.phaseDeg.toFixed(0)}°)`;
-    const tipX = boxLeft - 8;
-    const tipY = hData.src.y;
-    drawTextBadge(waveCtx, `點 #${hData.idx}: ${phaseValStr}`, tipX, tipY, {
+    // 柱狀圖左側懸浮標籤 (置於 boxLeft - 8 靠右對齊，指向左側寬暢區域，永不與狹縫擋板重疊)
+    const phaseValStr = `${hData.pathLambda.toFixed(2)}\u03bb (${hData.phaseDeg.toFixed(0)}\u00b0)`;
+    drawTextBadge(waveCtx, `\u9ede #${hData.idx}: ${phaseValStr}`, tipX, tipY, {
       textColor: '#facc15',
       borderColor: '#facc15',
       borderWidth: 1.5,
@@ -1439,13 +1429,13 @@ function drawPhaseBarChart(geom, w, h) {
   waveCtx.textAlign = 'left';
   waveCtx.textBaseline = 'middle';
   const bottomTextY = boxBottom - 10;
-  if (Math.abs(maxPathLambda - 1.0) < 0.12) {
+  if (Math.abs(maxPathLambda - 1.0) < 0.03) {
     waveCtx.fillStyle = '#fda4af';
     waveCtx.fillText('★ 第一暗紋 (λ/2 相消)', boxLeft + 8, bottomTextY);
-  } else if (Math.abs(maxPathLambda - 2.0) < 0.15) {
+  } else if (Math.abs(maxPathLambda - 2.0) < 0.04) {
     waveCtx.fillStyle = '#fda4af';
     waveCtx.fillText('★ 第二暗紋 (a/4 相消)', boxLeft + 8, bottomTextY);
-  } else if (maxPathLambda < 0.10) {
+  } else if (maxPathLambda < 0.04) {
     waveCtx.fillStyle = '#fef08a';
     waveCtx.fillText('★ 中央極大 (同相)', boxLeft + 8, bottomTextY);
   } else {
@@ -1599,7 +1589,8 @@ function renderScreenDisplays() {
 
   // 當前觀測角指示光標
   const currentThetaRad = (state.thetaDeg * Math.PI) / 180;
-  const curY = midY + (currentThetaRad / maxAngle) * (h * 0.5);
+  // CCW+: 正角度=逆時針=屏幕上方=y減小
+  const curY = midY - (currentThetaRad / maxAngle) * (h * 0.5);
   const curBeta = (Math.PI * a / wl) * Math.sin(currentThetaRad);
   let curI = 1.0;
   if (Math.abs(curBeta) > 1e-5) curI = Math.pow(Math.sin(curBeta) / curBeta, 2);
@@ -1638,7 +1629,8 @@ function renderSuperpositionScope() {
   scopeCtx.clearRect(0, 0, w, h);
 
   const thetaRad = (state.thetaDeg * Math.PI) / 180;
-  const sinT = Math.sin(thetaRad);
+  const geomRad = -thetaRad; // CCW+
+  const sinT = Math.sin(geomRad);
   const k = (2 * Math.PI) / state.wavelength;
 
   const simEl = document.getElementById('sim-container');
@@ -1983,7 +1975,8 @@ function updateMetrics() {
   const wl = state.wavelength;
   const thetaDeg = state.thetaDeg;
   const thetaRad = (thetaDeg * Math.PI) / 180;
-  const sinT = Math.sin(thetaRad);
+  const geomRad = -thetaRad; // CCW+
+  const sinT = Math.sin(geomRad);
 
   // 第一暗紋計算 a sinθ = λ
   const sinMin1 = wl / a;
@@ -2009,16 +2002,16 @@ function updateMetrics() {
   if (Math.abs(beta) > 1e-5) curI = Math.pow(Math.sin(beta) / beta, 2);
 
   if (valInterference) {
-    if (Math.abs(thetaDeg) < 0.8) {
+    if (Math.abs(thetaDeg) < 0.4) {
       valInterference.textContent = '中央極大 (完全相長)';
       valInterference.style.color = 'var(--accent-cyan)';
-    } else if (Math.abs(Math.abs(a * sinT) - wl) < wl * 0.1) {
+    } else if (Math.abs(Math.abs(a * sinT) - wl) < wl * 0.03) {
       valInterference.textContent = '第一暗紋 (完全相消 0%)';
       valInterference.style.color = 'var(--accent-pink)';
-    } else if (Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.1) {
+    } else if (Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.04) {
       valInterference.textContent = '第二暗紋 (完全相消 0%)';
       valInterference.style.color = 'var(--accent-pink)';
-    } else if (Math.abs(Math.abs(a * sinT) - 1.43 * wl) < wl * 0.12) {
+    } else if (Math.abs(Math.abs(a * sinT) - 1.43 * wl) < wl * 0.04) {
       valInterference.textContent = `第一副極大 (~4.7%)`;
       valInterference.style.color = 'var(--accent-cyan)';
     } else {
@@ -2028,8 +2021,8 @@ function updateMetrics() {
   }
 
   // 同步更新底部 HUD 相消教學橫幅 (第一暗紋 a/2 配對與第二暗紋 a/4 配對)
-  const isNearMin1 = Math.abs(Math.abs(a * sinT) - wl) < wl * 0.12;
-  const isNearMin2 = Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.12;
+  const isNearMin1 = Math.abs(Math.abs(a * sinT) - wl) < wl * 0.03;
+  const isNearMin2 = Math.abs(Math.abs(a * sinT) - 2 * wl) < wl * 0.04;
   updateBottomBanner(isNearMin1, isNearMin2);
 }
 
@@ -2046,6 +2039,7 @@ function updateZoomUI() {
  * 動畫主迴圈 (RAF)
  */
 let animFrameId = null;
+let _scopeLastPhase = -99999;
 function animationLoop() {
   if (state.isPlaying) {
     state.wavePhase += state.waveSpeed;
@@ -2057,10 +2051,16 @@ function animationLoop() {
     console.error('drawWaveScene error:', err);
   }
 
-  try {
-    renderSuperpositionScope();
-  } catch (err) {
-    console.error('renderSuperpositionScope error:', err);
+  // 右側示波器：wave mode 每幀重繪；diff mode 每隔半圈刷新，減少 GPU 閃爍
+  const needScopeRedraw = (state.phaseBarMode === 'wave') ||
+    (Math.abs(state.wavePhase - _scopeLastPhase) > Math.PI * 0.5);
+  if (needScopeRedraw) {
+    try {
+      renderSuperpositionScope();
+      _scopeLastPhase = state.wavePhase;
+    } catch (err) {
+      console.error('renderSuperpositionScope error:', err);
+    }
   }
 
   animFrameId = requestAnimationFrame(animationLoop);
@@ -2273,16 +2273,17 @@ function initEvents() {
           }
         }
         buildFreePointsStatus();
-        renderSuperpositionScope();
+        _scopeLastPhase = -99999; renderSuperpositionScope();
         return;
       }
     }
 
     const thetaRad = (state.thetaDeg * Math.PI) / 180;
+    const geomRad = -thetaRad; // CCW+
     const rayLen = Math.min(rect.width * 0.65, 480);
     const handleR = Math.min(320, rayLen * 0.85);
-    const handleX = geom.slitX + handleR * Math.cos(thetaRad);
-    const handleY = geom.centerY + handleR * Math.sin(thetaRad);
+    const handleX = geom.slitX + handleR * Math.cos(geomRad);
+    const handleY = geom.centerY + handleR * Math.sin(geomRad);
 
     const distToHandle = Math.hypot(worldX - handleX, worldY - handleY);
 
@@ -2319,10 +2320,11 @@ function initEvents() {
       const worldY = (y - state.panY) / state.zoom;
       const geom = getSlitGeometry(rect.width, rect.height);
       const thetaRad = (state.thetaDeg * Math.PI) / 180;
+      const geomRad = -thetaRad; // CCW+
       const rayLen = Math.min(rect.width * 0.65, 480);
       const handleR = Math.min(320, rayLen * 0.85);
-      const handleX = geom.slitX + handleR * Math.cos(thetaRad);
-      const handleY = geom.centerY + handleR * Math.sin(thetaRad);
+      const handleX = geom.slitX + handleR * Math.cos(geomRad);
+      const handleY = geom.centerY + handleR * Math.sin(geomRad);
 
       let foundBar = false;
       if (state.layers.phasebars && geom.sources.length > 0) {
@@ -2392,7 +2394,8 @@ function initEvents() {
 
     const dx = worldX - geom.slitX;
     const dy = worldY - geom.centerY;
-    let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    // CCW+: atan2因Y軸向下返負值=順時針，取負號轉換約定
+    let angle = -(Math.atan2(dy, dx) * 180) / Math.PI;
     angle = Math.max(-35, Math.min(35, angle));
 
     state.thetaDeg = angle;
@@ -2601,7 +2604,7 @@ function initEvents() {
       const N = state.numSources;
       fp.idx = (e.key === 'ArrowUp') ? Math.max(0, fp.idx - 1) : Math.min(N - 1, fp.idx + 1);
       buildFreePointsStatus();
-      renderSuperpositionScope();
+      _scopeLastPhase = -99999; renderSuperpositionScope();
       return;
     }
 
@@ -2611,7 +2614,7 @@ function initEvents() {
       state.freePoints[slot].enabled = false;
       state.selectedSlot = -1;
       buildFreePointsStatus();
-      renderSuperpositionScope();
+      _scopeLastPhase = -99999; renderSuperpositionScope();
       return;
     }
 
