@@ -1,0 +1,3141 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>球殼導體與靜電鏡像法模擬器</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- KaTeX for high-performance math formula rendering with CDN Fallback -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css"
+        onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css'">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js'"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js'"></script>
+
+    <!-- MathJax 3 as Secondary Fallback -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            },
+            startup: {
+                typeset: false
+            }
+        };
+    </script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js'"></script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            background-color: #090d16;
+            color: #f1f5f9;
+        }
+
+        canvas {
+            touch-action: none;
+        }
+
+        /* Custom sleek scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.7);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.7);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(100, 116, 139, 0.9);
+        }
+
+        /* Pure CSS / Offline Math Typography Fallback */
+        .math-symbol,
+        .math-var {
+            font-family: "Cambria Math", "Latin Modern Math", "Times New Roman", serif;
+            font-style: italic;
+        }
+
+        .math-frac {
+            display: inline-flex;
+            flex-direction: column;
+            vertical-align: middle;
+            text-align: center;
+            padding: 0 3px;
+            font-size: 0.88em;
+            line-height: 1.1;
+        }
+
+        .math-num {
+            border-bottom: 1px solid currentColor;
+            padding-bottom: 1px;
+        }
+
+        .math-den {
+            padding-top: 1px;
+        }
+
+        .math-disp {
+            display: block;
+            text-align: center;
+            margin: 0.6em 0;
+            overflow-x: auto;
+        }
+
+        /* KaTeX custom sizing tweaks */
+        .katex {
+            font-size: 1.05em !important;
+        }
+
+        .katex-display {
+            margin: 0.5em 0 !important;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 2px 0;
+        }
+
+        /* Pulsing and glow utilities */
+        .glow-amber {
+            filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6));
+        }
+
+        .glow-cyan {
+            filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5));
+        }
+
+        /* Vector arrow-on-top notation for HTML text */
+        .vec {
+            display: inline-block;
+            position: relative;
+            padding-top: 0.55em;
+        }
+        .vec::before {
+            content: '\2192';   /* → */
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.62em;
+            line-height: 1;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col xl:flex-row overflow-x-hidden">
+
+    <!-- Main Viewport: Canvas & Real-time Graph -->
+    <main class="flex-1 flex flex-col items-center p-2.5 sm:p-4 min-w-0 w-full relative">
+
+        <!-- Header Bar -->
+        <header
+            class="w-full max-w-6xl flex flex-wrap justify-between items-center mb-2.5 gap-2.5 bg-slate-900/90 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-800 shadow-xl">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid fa-atom text-white text-lg animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1
+                        class="text-base sm:text-xl font-bold bg-gradient-to-r from-cyan-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+                        球殼導體與靜電鏡像法模擬器
+                    </h1>
+                    <p id="headerSubtitle" class="text-[11px] sm:text-xs text-slate-400">
+                        拖曳腔內正電荷 <span class="text-amber-400 font-semibold">$+Q$</span> 觀測電力線流場、等位面與導體感應電荷分佈
+                    </p>
+                </div>
+            </div>
+
+            <!-- Mode Switcher Tabs (球內空腔 vs 球外內部抵銷教學) -->
+            <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
+                <button id="btnModeInside"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md">
+                    <i class="fa-solid fa-circle-dot"></i>
+                    <span>電荷在球內 (空腔鏡像)</span>
+                </button>
+                <button id="btnModeOutside"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200">
+                    <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                    <span>電荷在球外 (內部電場抵銷解說)</span>
+                </button>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button id="btnToggleGround"
+                    class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs rounded-xl transition border border-slate-700 flex items-center gap-1.5 text-slate-300 shadow-sm"
+                    title="切換孤立不帶電球殼 / 外壁接地">
+                    <i class="fa-solid fa-earth-americas text-emerald-400" id="groundIcon"></i>
+                    <span id="groundStatusText">球殼：中性孤立</span>
+                </button>
+                <button id="btnCenterCharge"
+                    class="px-3 py-1.5 bg-blue-950/80 hover:bg-blue-900 text-blue-300 border border-blue-700/50 active:scale-95 text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                    title="將點電荷移至球心或重設位置">
+                    <i class="fa-solid fa-crosshairs text-blue-400"></i>
+                    <span id="btnCenterText">電荷置中</span>
+                </button>
+                <button id="btnResetView"
+                    class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs rounded-xl transition border border-slate-700 flex items-center gap-1.5 text-slate-300 shadow-sm"
+                    title="重置視角縮放與位置">
+                    <i class="fa-solid fa-arrows-to-dot text-cyan-400"></i>
+                    <span>重置視角</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Canvas Container -->
+        <div
+            class="relative w-full max-w-6xl aspect-[4/3] sm:aspect-[16/9] max-h-[58vh] sm:max-h-[66vh] bg-slate-950 rounded-2xl border border-slate-800/90 overflow-hidden shadow-2xl flex items-center justify-center">
+
+            <canvas id="simCanvas" class="w-full h-full cursor-grab active:cursor-grabbing block"></canvas>
+
+            <!-- Real-Time HUD Overlay (Top-Left) -->
+            <div
+                class="absolute top-3 left-3 pointer-events-none flex flex-col gap-1 text-[11px] sm:text-xs font-mono bg-slate-900/85 backdrop-blur-md p-3 rounded-xl border border-slate-700/70 shadow-2xl min-w-[210px]">
+                <div
+                    class="text-slate-300 font-bold flex items-center justify-between border-b border-slate-700 pb-1 mb-0.5">
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> 即時物理量
+                    </span>
+                    <span id="hudStateBadge"
+                        class="text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-600/40 font-sans">孤立球殼</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="labelHudC" class="text-slate-400">偏心距 $c$:</span>
+                    <span id="valC" class="text-amber-400 font-bold font-mono">0.00</span>
+                    <span id="valCRatio" class="text-slate-500 text-[10px]">(0.00 a)</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="labelHudCprime" class="text-slate-400">鏡像位置 $c' = \frac{a^2}{c}$:</span>
+                    <span id="valCprime" class="text-indigo-400 font-bold font-mono">∞</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="labelHudQprime" class="text-slate-400">鏡像電量 $q' = -Q\frac{a}{c}$:</span>
+                    <span id="valQprime" class="text-purple-400 font-bold font-mono">-1.00 Q</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="labelHudSigma" class="text-slate-400">極大電荷密度 $\sigma_{\max}$:</span>
+                    <span id="valSigmaMax" class="text-rose-400 font-bold font-mono">0.00</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="labelHudForce" class="text-slate-400">淨吸引力 $|\vec{F}|$:</span>
+                    <span id="valForce" class="text-emerald-400 font-bold font-mono">0.00</span>
+                </div>
+            </div>
+
+            <!-- Interactive Guide Pill Overlay -->
+            <div id="dragHint"
+                class="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none bg-slate-900/90 backdrop-blur-md text-cyan-300 border border-cyan-500/40 text-[11px] sm:text-xs px-3.5 py-1.5 rounded-full shadow-2xl flex items-center gap-2 transition-opacity duration-500">
+                <i class="fa-solid fa-hand-pointer animate-bounce text-cyan-400"></i>
+                <span>按住拖曳 <b>$+Q$</b> ｜ 滾輪或雙指捏合縮放視角 ｜ 拖曳背景平移</span>
+            </div>
+
+            <!-- View Scale Badge -->
+            <div
+                class="absolute bottom-3 right-3 pointer-events-none text-[10px] font-mono bg-slate-900/80 backdrop-blur px-2 py-1 rounded-md border border-slate-800 text-slate-400">
+                縮放: <span id="valZoom" class="text-cyan-400 font-bold">100%</span>
+            </div>
+        </div>
+
+        <!-- Surface Charge Density Graph -->
+        <section
+            class="w-full max-w-6xl mt-2.5 bg-slate-900/90 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-slate-800 shadow-xl">
+            <div class="flex flex-wrap justify-between items-center mb-1.5 sm:mb-2 gap-2">
+                <h3 class="text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-area text-cyan-400"></i>
+                    <span id="graphTitle">內壁感應電荷密度分佈 $\sigma(\theta)$</span>
+                </h3>
+                <div class="flex items-center gap-4 text-[10px] sm:text-xs text-slate-400 font-mono">
+                    <span class="flex items-center gap-1.5">
+                        <span id="graphDotNear" class="w-2.5 h-1 bg-cyan-400 rounded-full inline-block"></span>
+                        <span id="graphLegendNear">$\theta = 0^\circ \text{ (近側)}$</span>
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <span id="graphDotFar" class="w-2.5 h-1 bg-indigo-400 rounded-full inline-block"></span>
+                        <span id="graphLegendFar">$\theta = 180^\circ \text{ (遠側)}$</span>
+                    </span>
+                    <span class="text-slate-300">
+                        總感應量: <b id="graphTotalCharge" class="text-rose-400 font-mono">-1.00 Q</b>
+                    </span>
+                </div>
+            </div>
+            <div
+                class="w-full h-20 sm:h-24 bg-slate-950 rounded-xl border border-slate-800/90 relative overflow-hidden">
+                <canvas id="graphCanvas" class="w-full h-full block"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <!-- Sidebar: Controls, Parameter Adjustments & Theory Guide -->
+    <aside
+        class="w-full xl:w-[410px] p-3 sm:p-5 bg-slate-900/95 border-t xl:border-t-0 xl:border-l border-slate-800 flex flex-col gap-4 overflow-y-auto max-h-none xl:max-h-screen">
+
+        <!-- Outside Mode Field View Selector (Visible in Outside Mode) -->
+        <div id="panelOutsideMode"
+            class="hidden bg-slate-950/80 p-3.5 sm:p-4 rounded-2xl border border-indigo-700/60 shadow-lg space-y-3 text-xs">
+            <h2 class="text-xs sm:text-sm font-bold text-indigo-300 flex items-center justify-between border-b border-indigo-900/60 pb-2">
+                <span class="flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-indigo-400"></i> 球外電荷教學解說開關
+                </span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 font-mono">自由疊加</span>
+            </h2>
+            <div class="space-y-1.5">
+                <label class="flex items-start gap-2.5 cursor-pointer p-2 rounded-xl border border-cyan-500/30 bg-slate-900/70 hover:bg-slate-800/80 transition">
+                    <input type="checkbox" id="chkShowTotalField" checked class="mt-0.5 w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                    <div>
+                        <div class="font-bold text-cyan-300 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block shadow-sm shadow-cyan-400/50"></span>
+                            <span>靜電平衡合電場 $\vec{E}_{\text{total}}$</span>
+                        </div>
+                        <div class="text-[10.5px] text-slate-400 mt-0.5">
+                            導體外的真實平衡彎曲電力線，球內合電場處處為零 ($E_{\text{total}} = 0$)。
+                        </div>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-2.5 cursor-pointer p-2 rounded-xl border border-amber-500/30 bg-slate-900/70 hover:bg-slate-800/80 transition">
+                    <input type="checkbox" id="chkShowQField" class="mt-0.5 w-4 h-4 accent-amber-500 rounded cursor-pointer">
+                    <div>
+                        <div class="font-bold text-amber-400 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow-sm shadow-amber-400/50"></span>
+                            <span>外電荷單獨電場 $\vec{E}_Q$</span>
+                        </div>
+                        <div class="text-[10.5px] text-slate-400 mt-0.5">
+                            點電荷 $+Q$ 產生的放射庫侖電場（黃色），可直接穿透球殼與導體內部。
+                        </div>
+                    </div>
+                </label>
+
+                <label class="flex items-start gap-2.5 cursor-pointer p-2 rounded-xl border border-purple-500/30 bg-slate-900/70 hover:bg-slate-800/80 transition">
+                    <input type="checkbox" id="chkShowIndField" class="mt-0.5 w-4 h-4 accent-purple-500 rounded cursor-pointer">
+                    <div>
+                        <div class="font-bold text-purple-400 flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-purple-400 inline-block shadow-sm shadow-purple-400/50"></span>
+                            <span>感應電荷單獨電場 $\vec{E}_{\text{ind}}$</span>
+                        </div>
+                        <div class="text-[10.5px] text-slate-400 mt-0.5">
+                            表面感應電荷單獨建立的電場（紫色）：球內完全反向抵銷外場，球外由感應電荷向外/向內放射。
+                        </div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Outside options checkboxes -->
+            <div class="pt-2 border-t border-slate-800/80 grid grid-cols-1 gap-2 text-xs">
+                <label class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-1.5 rounded-lg">
+                    <span class="text-slate-300">虛擬鏡像電荷</span>
+                    <input type="checkbox" id="chkOutsideImages" checked class="accent-purple-500 rounded">
+                </label>
+            </div>
+        </div>
+
+        <!-- Visualization Toggles (Inside Cavity Mode) -->
+        <div id="panelInsideToggles" class="bg-slate-950/80 p-3.5 sm:p-4 rounded-2xl border border-slate-800/90 shadow-lg">
+            <h2
+                class="text-xs sm:text-sm font-bold text-slate-200 mb-2.5 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i> 腔內視覺化開關
+            </h2>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block shadow-sm shadow-cyan-400/50"></span>
+                        腔內電力線
+                    </span>
+                    <input type="checkbox" id="chkFieldLines" checked
+                        class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                </label>
+
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow-sm shadow-amber-400/50"></span>
+                        等位面等高線
+                    </span>
+                    <input type="checkbox" id="chkContours" checked
+                        class="w-4 h-4 accent-amber-500 rounded cursor-pointer">
+                </label>
+
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block shadow-sm shadow-purple-500/50"></span>
+                        鏡像電荷 $q'$
+                    </span>
+                    <input type="checkbox" id="chkImageCharge" checked
+                        class="w-4 h-4 accent-purple-500 rounded cursor-pointer">
+                </label>
+
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block shadow-sm shadow-rose-400/50"></span>
+                        內壁感應電荷
+                    </span>
+                    <input type="checkbox" id="chkSurfaceCharge" checked
+                        class="w-4 h-4 accent-rose-500 rounded cursor-pointer">
+                </label>
+
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400/50"></span>
+                        淨吸引力 $\vec{F}$
+                    </span>
+                    <input type="checkbox" id="chkForceVector" checked
+                        class="w-4 h-4 accent-emerald-500 rounded cursor-pointer">
+                </label>
+
+                <label
+                    class="flex items-center justify-between cursor-pointer hover:bg-slate-800/60 p-2 rounded-xl transition border border-transparent hover:border-slate-700">
+                    <span class="flex items-center gap-1.5 text-slate-300">
+                        <span
+                            class="w-2.5 h-2.5 rounded-full bg-indigo-400 inline-block shadow-sm shadow-indigo-400/50"></span>
+                        球外放射電場
+                    </span>
+                    <input type="checkbox" id="chkOuterField" checked
+                        class="w-4 h-4 accent-indigo-500 rounded cursor-pointer">
+                </label>
+            </div>
+        </div>
+
+        <!-- Geometric and Physical Sliders -->
+        <div class="bg-slate-950/80 p-3.5 sm:p-4 rounded-2xl border border-slate-800/90 shadow-lg space-y-3.5 text-xs">
+            <h2
+                class="text-xs sm:text-sm font-bold text-slate-200 mb-1 flex items-center gap-2 border-b border-slate-800 pb-2">
+                <i class="fa-solid fa-ruler-combined text-indigo-400"></i> 參數微調
+            </h2>
+
+            <!-- Charge Position Ratio c/a or d/b Slider -->
+            <div id="rowSliderC">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span id="sliderCTitle">電荷偏心比 $c/a$:</span>
+                    <span id="labelC" class="text-amber-400 font-bold">0.00</span>
+                </div>
+                <input type="range" id="sliderC" min="0" max="0.88" step="0.01" value="0"
+                    class="w-full accent-amber-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Inner Radius a Slider -->
+            <div id="rowSliderA">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>空腔內半徑 $a$:</span>
+                    <span id="labelA" class="text-blue-400 font-bold">140 px</span>
+                </div>
+                <input type="range" id="sliderA" min="90" max="175" value="140"
+                    class="w-full accent-blue-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Outer Radius b Slider -->
+            <div id="rowSliderB">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span id="sliderBTitle">導體外半徑 $b$:</span>
+                    <span id="labelB" class="text-indigo-400 font-bold">210 px</span>
+                </div>
+                <input type="range" id="sliderB" min="170" max="260" value="210"
+                    class="w-full accent-indigo-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Density of Field Lines -->
+            <div id="rowSliderLines">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>電力線密度:</span>
+                    <span id="labelLines" class="text-cyan-400 font-bold">36 條</span>
+                </div>
+                <input type="range" id="sliderLines" min="16" max="64" step="4" value="36"
+                    class="w-full accent-cyan-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Number of Equipotential Contours -->
+            <div id="rowSliderContours">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>等位線圈數:</span>
+                    <span id="labelContours" class="text-amber-400 font-bold">8 圈</span>
+                </div>
+                <input type="range" id="sliderContours" min="6" max="12" step="2" value="8"
+                    class="w-full accent-amber-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Equipotential Expansion/Range Scale -->
+            <div id="rowSliderEquiScale">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>等位線擴展範圍 (大圈度):</span>
+                    <span id="labelEquiScale" class="text-amber-400 font-bold">1.5x</span>
+                </div>
+                <input type="range" id="sliderEquiScale" min="0.5" max="3.0" step="0.1" value="1.5"
+                    class="w-full accent-amber-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Display Size Scale for Symbols & Fonts (TV/Projector Mode) -->
+            <div id="rowSliderSymbolScale">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>投影字體/符號大小 (遠距投影):</span>
+                    <span id="labelSymbolScale" class="text-emerald-400 font-bold">1.4x</span>
+                </div>
+                <input type="range" id="sliderSymbolScale" min="1.0" max="2.6" step="0.1" value="1.4"
+                    class="w-full accent-emerald-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Outer Field Line Extension Range -->
+            <div id="rowSliderOuterReach">
+                <div class="flex justify-between text-slate-300 mb-1 font-mono">
+                    <span>外部電場延伸遠度:</span>
+                    <span id="labelOuterReach" class="text-sky-400 font-bold">全域延伸 (邊界)</span>
+                </div>
+                <input type="range" id="sliderOuterReach" min="1" max="4" step="1" value="4"
+                    class="w-full accent-sky-500 bg-slate-800 rounded-lg cursor-pointer">
+            </div>
+        </div>
+
+        <!-- Theoretical Physics and Formulas Card -->
+        <div
+            class="bg-slate-950/80 p-3.5 sm:p-4 rounded-2xl border border-slate-800/90 shadow-lg text-xs text-slate-300 space-y-3 leading-relaxed">
+            <h2
+                class="text-xs sm:text-sm font-bold text-slate-100 flex items-center justify-between border-b border-slate-800 pb-2">
+                <span class="flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-amber-400"></i> 理論推導與公式解析
+                </span>
+                <span class="text-[10px] text-cyan-400 font-mono">靜電學專題</span>
+            </h2>
+
+            <!-- Theory Inside Cavity -->
+            <div id="theoryInside" class="space-y-3 text-[11.5px]">
+                <!-- Item 1: Image Charge -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-1 text-[10px] bg-cyan-950 text-cyan-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        鏡像法原理 (Method of Images)
+                    </h4>
+                    <p class="text-slate-300">
+                        利用球外虛擬鏡像電荷 $q'$ 取代導體內壁感應電荷的效應，使腔壁 $r = a$ 處滿足等電位邊界條件：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 font-mono text-center">
+                        $$c' = \frac{a^2}{c}, \quad q' = -Q\frac{a}{c}$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        當 $c \to 0$ (電荷位於球心) 時，$c' \to \infty$，$q' \to -\infty$，鏡像電場退化為均勻常數電位 $-Q/a$。
+                    </p>
+                </div>
+
+                <!-- Item 2: Surface Charge Density -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-rose-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-2 text-[10px] bg-rose-950 text-rose-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        內壁感應電荷面密度 $\sigma(\theta)$
+                    </h4>
+                    <p class="text-slate-300">
+                        依據高斯定理與導體表面場強關係 $E_n = \sigma / \varepsilon_0$，內壁分佈為：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 text-center">
+                        $$\sigma(\theta) = -\frac{Q}{4\pi a} \frac{a^2 - c^2}{\left(a^2 + c^2 -
+                        2ac\cos\theta\right)^{3/2}}$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        總感應電荷積分恆為 $\oint \sigma \, dA = -Q$。電荷越偏離球心，$\theta=0^\circ$ 側的負電荷聚集越劇烈。
+                    </p>
+                </div>
+
+                <!-- Item 3: Attraction Force -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-3 text-[10px] bg-emerald-950 text-emerald-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        點電荷受到的淨吸引力 $\vec{F}$
+                    </h4>
+                    <p class="text-slate-300">
+                        電荷 $+Q$ 受到內壁非均勻感應電荷的淨吸引力，等價於真實電荷與虛擬鏡像電荷間的庫侖吸引力：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 text-center">
+                        $$\vec{F} = \frac{k Q |q'|}{(c' - c)^2} \hat{r} = \frac{k Q^2 a c}{\left(a^2 - c^2\right)^2}
+                        \hat{r}$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        方向恆指向距離最近的腔壁。當 $c=0$ 時受力為零（對稱平衡）；當 $c \to a$ 時吸引力急劇發散。
+                    </p>
+                </div>
+
+                <!-- Item 4: Electrostatic Shielding -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-indigo-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-4 text-[10px] bg-indigo-950 text-indigo-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        靜電屏蔽與外表面特性
+                    </h4>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-300">
+                        <li><b>導體殼內部 ($a < r < b$)</b>：靜電平衡下 $\vec{E} = 0$，電位恆為常數。</li>
+                        <li><b>中性孤立球殼</b>：外壁聚集 $+Q$ 且均勻分佈，外部電場 $E = \frac{kQ}{r^2}$ 呈完美中心對稱放射狀，無論 $+Q$
+                            在腔內如何偏心移動，外部電場均完全不變！</li>
+                        <li><b>接地球殼</b>：外表面電荷經接地流入大地，$Q_{\text{out}} = 0$，外部完全無電場 ($E_{\text{ext}} = 0$)。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Theory Outside Conductor (Cancellation Explanation) -->
+            <div id="theoryOutside" class="hidden space-y-3 text-[11.5px]">
+                <!-- Item 1: E_Q -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-1 text-[10px] bg-amber-950 text-amber-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        外電荷電場 $\vec{E}_Q$ (穿透外場)
+                    </h4>
+                    <p class="text-slate-300">
+                        點電荷 $+Q$ 在空間任意位置 $\vec{r}$ 產生的庫侖電場為：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 text-center font-mono text-amber-400">
+                        $$\vec{E}_Q(\vec{r}) = \frac{k Q (\vec{r} - \vec{d})}{|\vec{r} - \vec{d}|^3}$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        此放射狀電場穿透整片空間，包含導體球內部區域（由近端指向遠端）。
+                    </p>
+                </div>
+
+                <!-- Item 2: E_ind -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-purple-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-2 text-[10px] bg-purple-950 text-purple-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        感應電荷電場 $\vec{E}_{\text{ind}}$ (球內反向)
+                    </h4>
+                    <p class="text-slate-300">
+                        在外場影響下，導體表面電子重新分佈：近側聚集負感應電荷、遠側聚集正感應電荷。在<b>導體球內部</b>，感應電荷產生由遠端指向近端的反向電場：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 text-center font-mono text-purple-300">
+                        $$\vec{E}_{\text{ind}}(\vec{r}) = -\vec{E}_Q(\vec{r}) \quad (\forall r < b)$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        方向精確朝向外電荷 $+Q$，大小處處與外場 $\vec{E}_Q$ 嚴格相等！
+                    </p>
+                </div>
+
+                <!-- Item 3: Total Field Cancellation -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-emerald-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-3 text-[10px] bg-emerald-950 text-emerald-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        靜電平衡內部電場完全抵銷
+                    </h4>
+                    <p class="text-slate-300">
+                        依據疊加原理，導體內部的總合電場恆為零：
+                    </p>
+                    <div class="my-1.5 p-2 bg-slate-950 rounded-lg border border-slate-800 text-center font-mono text-emerald-400 font-bold">
+                        $$\vec{E}_{\text{total}}(\vec{r}) = \vec{E}_Q(\vec{r}) + \vec{E}_{\text{ind}}(\vec{r}) \equiv 0 \quad (\forall r < b)$$
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        若內部電場不為零，自由電子將持續受力漂移，直到感應場與外場完美抵銷。這就是「導體內部電場為零」的微觀機理！
+                    </p>
+                </div>
+
+                <!-- Item 4: Image charge for outside -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <h4 class="font-bold text-indigo-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-4 text-[10px] bg-indigo-950 text-indigo-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        球外區域之鏡像法解
+                    </h4>
+                    <p class="text-slate-300">
+                        在球體<b>外部</b> ($r \ge b$)，感應電荷的電場等價於虛擬鏡像電荷：
+                    </p>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-300 mt-1">
+                        <li>偏心鏡像：位於 $d' = \frac{b^2}{d}$ 處，電量 $q' = -Q\frac{b}{d}$。</li>
+                        <li>球心鏡像 (中性孤立球)：位於原點 $(0,0)$，電量 $q_0 = +Q\frac{b}{d}$。</li>
+                        <li>受力：外電荷受到導體感應電荷的淨吸引力，方向指向球心。</li>
+                    </ul>
+                </div>
+
+                <!-- Item 5: Why Induced Charges Affect External Space -->
+                <div class="bg-slate-900/60 p-2.5 rounded-xl border border-indigo-700/50 bg-indigo-950/20">
+                    <h4 class="font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
+                        <i
+                            class="fa-solid fa-lightbulb text-[10px] bg-cyan-950 text-cyan-400 w-4 h-4 rounded-full inline-flex items-center justify-center"></i>
+                        感應電荷會影響外部電場嗎？（常見概念解析）
+                    </h4>
+                    <p class="text-slate-300 leading-normal">
+                        <b>答案是：必然會！</b> 依據庫侖定律，表面感應電荷所建立的電場同樣會穿透到導體外部全空間：
+                    </p>
+                    <ul class="list-disc pl-4 space-y-1 text-slate-300 mt-1.5">
+                        <li><b>內部剛好抵銷</b>：導體內部自由電子持續移動，直到感應場在內部處處與外場反向相等（$\vec{E}_Q + \vec{E}_{\text{ind}} = 0$）。</li>
+                        <li><b>外部無法抵銷，導致電力線彎曲</b>：在導體外部，兩者幾何方位不同，向量疊加後形成<b>向導體彎曲的合電力線</b>並垂直入射表面。</li>
+                        <li><b>吸引力的物理鐵證</b>：外電荷 $+Q$ 受到的庫侖吸引力 $\vec{F}$，正是表面感應電荷在外部空間施加的電場力！若感應電荷不影響外部，$+Q$ 將完全感受不到導體的存在。</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Simulation & Math Rendering Script -->
+    <script>
+        // ==========================================
+        // 1. Math Formula Rendering Engine & Fallback
+        // ==========================================
+        function renderAllFormulas() {
+            let rendered = false;
+
+            // Attempt KaTeX auto-render first
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(document.body, {
+                        delimiters: [
+                            { left: '$$', right: '$$', display: true },
+                            { left: '\\[', right: '\\]', display: true },
+                            { left: '$', right: '$', display: false },
+                            { left: '\\(', right: '\\)', display: false }
+                        ],
+                        throwOnError: false,
+                        errorColor: '#f43f5e'
+                    });
+                    rendered = true;
+                } catch (e) {
+                    console.warn("KaTeX render error:", e);
+                }
+            }
+
+            // Fallback to MathJax 3 if KaTeX was unavailable
+            if (!rendered && window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                window.MathJax.typesetPromise().then(() => {
+                    rendered = true;
+                }).catch(err => console.warn("MathJax error:", err));
+            }
+
+            // Offline pure CSS / HTML fallback parser if no external CDN is reached
+            if (!rendered) {
+                applyPureHtmlMathFallback();
+            }
+        }
+
+        // Offline Regex-based fallback formatter for LaTeX math notation
+        function applyPureHtmlMathFallback() {
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+            const nodesToReplace = [];
+
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (node.parentElement && ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(node.parentElement.tagName)) continue;
+                if (node.nodeValue.includes('$')) {
+                    nodesToReplace.push(node);
+                }
+            }
+
+            nodesToReplace.forEach(node => {
+                const text = node.nodeValue;
+                if (!text.includes('$')) return;
+
+                let html = text;
+                // Display math $$ ... $$
+                html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+                    return `<span class="math-disp">${formatRawLatex(math)}</span>`;
+                });
+                // Inline math $ ... $
+                html = html.replace(/\$([^\$\n]+?)\$/g, (_, math) => {
+                    return `<span class="math-inline">${formatRawLatex(math)}</span>`;
+                });
+
+                if (html !== text) {
+                    const span = document.createElement('span');
+                    span.innerHTML = html;
+                    node.parentNode.replaceChild(span, node);
+                }
+            });
+        }
+
+        function formatRawLatex(str) {
+            let s = str.trim();
+            // Greek symbols
+            s = s.replace(/\\sigma/g, 'σ')
+                .replace(/\\theta/g, 'θ')
+                .replace(/\\pi/g, 'π')
+                .replace(/\\varepsilon_0/g, 'ε₀')
+                .replace(/\\varepsilon/g, 'ε')
+                .replace(/\\infty/g, '∞')
+                .replace(/\\oint/g, '∮')
+                .replace(/\\hat\{r\}/g, '<span class="math-symbol">r̂</span>')
+                .replace(/\\vec\{([a-zA-Z])\}/g, '<span class="vec">$1</span>')
+                .replace(/\\vec\s+([a-zA-Z])/g, '<span class="vec">$1</span>')
+                .replace(/\\quad/g, '&nbsp;&nbsp;')
+                .replace(/\\text\{([^}]+)\}/g, '$1')
+                .replace(/\\cos/g, 'cos')
+                .replace(/\\left\(/g, '(')
+                .replace(/\\right\)/g, ')')
+                .replace(/\\max/g, 'max');
+
+            // Fractions: \frac{A}{B}
+            s = s.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '<span class="math-frac"><span class="math-num">$1</span><span class="math-den">$2</span></span>');
+
+            // Superscripts & Subscripts
+            s = s.replace(/\^\{([^{}]+)\}/g, '<sup>$1</sup>').replace(/\^([0-9a-zA-Z])/g, '<sup>$1</sup>');
+            s = s.replace(/_\{([^{}]+)\}/g, '<sub>$1</sub>').replace(/_([0-9a-zA-Z])/g, '<sub>$1</sub>');
+
+            return s;
+        }
+
+        // Initialize math rendering with resilient retry loop
+        let mathRenderAttempts = 0;
+        function tryRenderMath() {
+            if (typeof renderMathInElement === 'function') {
+                renderAllFormulas();
+            } else if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+                renderAllFormulas();
+            } else if (mathRenderAttempts < 25) {
+                mathRenderAttempts++;
+                setTimeout(tryRenderMath, 150);
+            } else {
+                // If CDNs completely fail or user is offline, apply pure HTML/CSS fallback
+                applyPureHtmlMathFallback();
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', tryRenderMath);
+        } else {
+            tryRenderMath();
+        }
+        window.addEventListener('load', tryRenderMath);
+
+
+        // ==========================================
+        // 2. Physics Model & Interactive Simulator
+        // ==========================================
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+
+        // Geometric & Physical Parameters
+        let a = 140; // Inner cavity radius
+        let b = 210; // Outer shell radius
+        let Q = 1.0; // Charge inside cavity
+        let chargePos = { x: 0, y: 0 }; // Position of charge +Q
+        let isGrounded = false; // Is outer shell grounded?
+        let numFieldLines = 36;
+        let numEquiContours = 8;
+        let equiScaleMultiplier = 1.5; // Multiplier to make equipotentials bigger and spread wider
+        let symbolScaleMultiplier = 1.4; // Multiplier for charge symbols, node sizes, and text for TV projection
+        let outerReachMultiplier = 4; // 1 = 1.5b, 4 = full canvas boundary
+
+        // View Transform State (Pan & Zoom)
+        let scale = 1.0;
+        let panOffset = { x: 0, y: 0 };
+        let isDraggingCharge = false;
+        let isPanning = false;
+        let startPanPos = { x: 0, y: 0 };
+        let initialPinchDist = null;
+        let initialScale = 1.0;
+
+        // UI Element References
+        const chkFieldLines = document.getElementById('chkFieldLines');
+        const chkContours = document.getElementById('chkContours');
+        const chkImageCharge = document.getElementById('chkImageCharge');
+        const chkSurfaceCharge = document.getElementById('chkSurfaceCharge');
+        const chkForceVector = document.getElementById('chkForceVector');
+        const chkOuterField = document.getElementById('chkOuterField');
+
+        // Mode and Outside UI Elements
+        const btnModeInside = document.getElementById('btnModeInside');
+        const btnModeOutside = document.getElementById('btnModeOutside');
+        const headerSubtitle = document.getElementById('headerSubtitle');
+        const panelInsideToggles = document.getElementById('panelInsideToggles');
+        const panelOutsideMode = document.getElementById('panelOutsideMode');
+        const theoryInside = document.getElementById('theoryInside');
+        const theoryOutside = document.getElementById('theoryOutside');
+        const chkOutsideImages = document.getElementById('chkOutsideImages');
+        const chkShowTotalField = document.getElementById('chkShowTotalField');
+        const chkShowQField = document.getElementById('chkShowQField');
+        const chkShowIndField = document.getElementById('chkShowIndField');
+
+        const rowSliderA = document.getElementById('rowSliderA');
+        const rowSliderContours = document.getElementById('rowSliderContours');
+        const rowSliderEquiScale = document.getElementById('rowSliderEquiScale');
+        const rowSliderOuterReach = document.getElementById('rowSliderOuterReach');
+        const sliderCTitle = document.getElementById('sliderCTitle');
+        const sliderBTitle = document.getElementById('sliderBTitle');
+
+        const sliderC = document.getElementById('sliderC');
+        const sliderA = document.getElementById('sliderA');
+        const sliderB = document.getElementById('sliderB');
+        const sliderLines = document.getElementById('sliderLines');
+        const sliderContours = document.getElementById('sliderContours');
+        const sliderEquiScale = document.getElementById('sliderEquiScale');
+        const sliderSymbolScale = document.getElementById('sliderSymbolScale');
+        const sliderOuterReach = document.getElementById('sliderOuterReach');
+
+        const labelC = document.getElementById('labelC');
+        const labelA = document.getElementById('labelA');
+        const labelB = document.getElementById('labelB');
+        const labelLines = document.getElementById('labelLines');
+        const labelContours = document.getElementById('labelContours');
+        const labelEquiScale = document.getElementById('labelEquiScale');
+        const labelSymbolScale = document.getElementById('labelSymbolScale');
+        const labelOuterReach = document.getElementById('labelOuterReach');
+
+        const labelHudC = document.getElementById('labelHudC');
+        const labelHudCprime = document.getElementById('labelHudCprime');
+        const labelHudQprime = document.getElementById('labelHudQprime');
+        const labelHudSigma = document.getElementById('labelHudSigma');
+        const labelHudForce = document.getElementById('labelHudForce');
+
+        const valC = document.getElementById('valC');
+        const valCRatio = document.getElementById('valCRatio');
+        const valCprime = document.getElementById('valCprime');
+        const valQprime = document.getElementById('valQprime');
+        const valSigmaMax = document.getElementById('valSigmaMax');
+        const valForce = document.getElementById('valForce');
+        const valZoom = document.getElementById('valZoom');
+        const hudStateBadge = document.getElementById('hudStateBadge');
+
+        const graphTitle = document.getElementById('graphTitle');
+        const graphLegendNear = document.getElementById('graphLegendNear');
+        const graphLegendFar = document.getElementById('graphLegendFar');
+        const graphTotalCharge = document.getElementById('graphTotalCharge');
+
+        const btnToggleGround = document.getElementById('btnToggleGround');
+        const groundIcon = document.getElementById('groundIcon');
+        const groundStatusText = document.getElementById('groundStatusText');
+        const btnCenterCharge = document.getElementById('btnCenterCharge');
+        const btnCenterText = document.getElementById('btnCenterText');
+        const btnResetView = document.getElementById('btnResetView');
+        const dragHint = document.getElementById('dragHint');
+
+        // Mode State
+        let simMode = 'inside'; // 'inside' | 'outside'
+        let showOutsideImages = true;
+        let showOutsideTotal = true;
+        let showOutsideQ = false;
+        let showOutsideInd = false;
+        let chargePosInside = { x: 0, y: 0 };
+        let chargePosOutside = { x: 330, y: 0 };
+        let mouseWorldPos = { x: 0, y: 0 };
+        let isMouseInsideSphere = false;
+
+        // Switch Simulation Mode between "Inside Cavity" and "Outside Conductor Cancellation"
+        function setSimMode(mode) {
+            simMode = mode;
+            if (mode === 'inside') {
+                btnModeInside.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md";
+                btnModeOutside.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200";
+
+                headerSubtitle.innerHTML = "導體球殼空腔與鏡像法 &mdash; 拖曳 <span class=\"text-amber-400 font-semibold\">$+Q$</span> 觀測電力線流場、等位面與導體感應電荷分佈";
+
+                panelInsideToggles.classList.remove('hidden');
+                panelOutsideMode.classList.add('hidden');
+                theoryInside.classList.remove('hidden');
+                theoryOutside.classList.add('hidden');
+
+                rowSliderA.classList.remove('hidden');
+                rowSliderContours.classList.remove('hidden');
+                rowSliderEquiScale.classList.remove('hidden');
+                rowSliderOuterReach.classList.remove('hidden');
+
+                sliderCTitle.innerHTML = '電荷偏心比 $c/a$:';
+                sliderC.min = "0";
+                sliderC.max = "0.88";
+                sliderC.step = "0.01";
+                sliderBTitle.innerHTML = '導體外半徑 $b$:';
+
+                labelHudC.innerHTML = '偏心距 $c$:';
+                labelHudCprime.innerHTML = '鏡像位置 $c\' = \\frac{a^2}{c}$:';
+                labelHudQprime.innerHTML = '鏡像電量 $q\' = -Q\\frac{a}{c}$:';
+                labelHudSigma.innerHTML = '極大電荷密度 $\\sigma_{\\max}$:';
+                labelHudForce.innerHTML = '淨吸引力 $|\\vec{F}|$:';
+
+                hudStateBadge.textContent = isGrounded ? "外壁接地" : "孤立球殼";
+                hudStateBadge.className = isGrounded
+                    ? "text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 font-sans"
+                    : "text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-600/40 font-sans";
+                groundStatusText.textContent = isGrounded ? "球殼：接地 (V = 0)" : "球殼：中性孤立";
+
+                graphTitle.innerHTML = '內壁感應電荷密度分佈 $\\sigma(\\theta)$';
+                graphLegendNear.innerHTML = '$\\theta = 0^\\circ \\text{ (近側)}$';
+                graphLegendFar.innerHTML = '$\\theta = 180^\\circ \\text{ (遠側)}$';
+                graphTotalCharge.textContent = '-1.00 Q';
+                graphTotalCharge.className = 'text-rose-400 font-mono';
+                btnCenterText.textContent = "電荷置中";
+
+                chargePosOutside = { ...chargePos };
+                chargePos = { ...chargePosInside };
+                const cVal = Math.hypot(chargePos.x, chargePos.y);
+                const ratio = cVal / a;
+                sliderC.value = ratio.toFixed(2);
+                labelC.textContent = ratio.toFixed(2);
+            } else {
+                btnModeOutside.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md";
+                btnModeInside.className = "px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 text-slate-400 hover:text-slate-200";
+
+                headerSubtitle.innerHTML = "導體球外電荷與內部電場抵銷演示 &mdash; <span class=\"text-indigo-300 font-semibold\">$\\vec{E}_Q + \\vec{E}_{\\text{ind}} = 0$</span>";
+
+                panelInsideToggles.classList.add('hidden');
+                panelOutsideMode.classList.remove('hidden');
+                theoryInside.classList.add('hidden');
+                theoryOutside.classList.remove('hidden');
+
+                rowSliderA.classList.add('hidden');
+                rowSliderContours.classList.add('hidden');
+                rowSliderEquiScale.classList.add('hidden');
+                rowSliderOuterReach.classList.add('hidden');
+
+                sliderCTitle.innerHTML = '電荷距離比 $d/b$:';
+                sliderC.min = "1.10";
+                sliderC.max = "2.80";
+                sliderC.step = "0.02";
+                sliderBTitle.innerHTML = '導體球半徑 $R = b$:';
+
+                labelHudC.innerHTML = '電荷距離 $d$:';
+                labelHudCprime.innerHTML = '鏡像距離 $d\' = \\frac{b^2}{d}$:';
+                labelHudQprime.innerHTML = '鏡像電量 $q\' = -Q\\frac{b}{d}$:';
+                labelHudSigma.innerHTML = '近端電荷密度 $\\sigma(0)$:';
+                labelHudForce.innerHTML = '受導體吸引力 $|\\vec{F}|$:';
+
+                hudStateBadge.textContent = isGrounded ? "導體球接地" : "孤立導體球";
+                hudStateBadge.className = isGrounded
+                    ? "text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 font-sans"
+                    : "text-[9px] uppercase px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-600/40 font-sans";
+                groundStatusText.textContent = isGrounded ? "導體球：接地 (V = 0)" : "導體球：中性孤立";
+
+                graphTitle.innerHTML = '球表面感應電荷分佈 $\\sigma(\\theta)$ (近端負電 $\\to$ 遠端正電)';
+                graphLegendNear.innerHTML = '$\\theta = 0^\\circ \\text{ (近側負電)}$';
+                graphLegendFar.innerHTML = '$\\theta = 180^\\circ \\text{ (遠側正電)}$';
+                graphTotalCharge.textContent = isGrounded ? '-Q(b/d)' : '0.00 Q (中性)';
+                graphTotalCharge.className = isGrounded ? 'text-rose-400 font-mono' : 'text-emerald-400 font-mono';
+                btnCenterText.textContent = "重設電荷位置";
+
+                chargePosInside = { ...chargePos };
+                if (Math.hypot(chargePosOutside.x, chargePosOutside.y) < b + 15) {
+                    chargePosOutside = { x: b * 1.55, y: 0 };
+                }
+                chargePos = { ...chargePosOutside };
+                const dVal = Math.hypot(chargePos.x, chargePos.y);
+                const ratio = dVal / b;
+                sliderC.value = ratio.toFixed(2);
+                labelC.textContent = ratio.toFixed(2);
+            }
+
+            tryRenderMath();
+        }
+
+        // Handle Canvas Resizing with Device Pixel Ratio for High-DPI screens
+        function resizeCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+
+            // Sim Canvas
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.resetTransform?.();
+            ctx.scale(dpr, dpr);
+
+            // Graph Canvas
+            const gRect = graphCanvas.getBoundingClientRect();
+            graphCanvas.width = gRect.width * dpr;
+            graphCanvas.height = gRect.height * dpr;
+            graphCtx.resetTransform?.();
+            graphCtx.scale(dpr, dpr);
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+
+        // Calculate state of real charge and virtual image charge
+        function getPhysicsState() {
+            const rect = canvas.getBoundingClientRect();
+            const center = {
+                x: rect.width / 2 + panOffset.x,
+                y: rect.height / 2 + panOffset.y
+            };
+            const cVec = { x: chargePos.x, y: chargePos.y };
+            const dist = Math.hypot(cVec.x, cVec.y);
+
+            if (simMode === 'inside') {
+                const c = dist;
+                let qPrime = 0;
+                let cPrimeDist = Infinity;
+                let imagePos = { x: 0, y: 0 };
+                let attractionForce = 0;
+
+                if (c > 1e-4) {
+                    qPrime = -Q * (a / c);
+                    cPrimeDist = (a * a) / c;
+                    const unitC = { x: cVec.x / c, y: cVec.y / c };
+                    imagePos = { x: unitC.x * cPrimeDist, y: unitC.y * cPrimeDist };
+
+                    // Coulomb force on +Q due to inner surface induced charges (via image charge q')
+                    const denom = (a * a - c * c);
+                    if (denom > 1e-3) {
+                        attractionForce = (a * c) / Math.pow(denom, 2) * 5000;
+                    } else {
+                        attractionForce = 999.9;
+                    }
+                } else {
+                    qPrime = -Q;
+                    cPrimeDist = Infinity;
+                    imagePos = { x: Infinity, y: Infinity };
+                    attractionForce = 0;
+                }
+
+                return { center, cVec, c, dist: c, qPrime, cPrimeDist, imagePos, attractionForce };
+            } else {
+                // Outside conductor mode
+                const d = Math.max(b + 5, dist);
+                const unitD = { x: cVec.x / d, y: cVec.y / d };
+
+                // Virtual image charge inside sphere: d' = b^2 / d, q' = -Q * (b / d)
+                const dPrime = (b * b) / d;
+                const qPrime = -Q * (b / d);
+                const imagePos = { x: unitD.x * dPrime, y: unitD.y * dPrime };
+
+                // Center virtual charge (if isolated conductor)
+                const q0 = isGrounded ? 0 : -qPrime; // +Q * (b / d)
+                const centerImagePos = { x: 0, y: 0 };
+
+                // Attractive force on external charge +Q due to conductor
+                const denom = (d * d - b * b);
+                let attractionForce = 0;
+                if (denom > 1e-2) {
+                    if (isGrounded) {
+                        attractionForce = (b * d) / Math.pow(denom, 2) * 8000;
+                    } else {
+                        attractionForce = (Math.pow(b, 3) * (2 * d * d - b * b)) / (Math.pow(d, 3) * Math.pow(denom, 2)) * 8000;
+                    }
+                }
+
+                return {
+                    center,
+                    cVec,
+                    c: d,
+                    dist: d,
+                    d,
+                    dPrime,
+                    qPrime,
+                    cPrimeDist: dPrime,
+                    imagePos,
+                    q0,
+                    centerImagePos,
+                    attractionForce
+                };
+            }
+        }
+
+        // Cavity Electrostatic Potential V(r)
+        function getCavityPotential(x, y, state) {
+            const { cVec, qPrime, imagePos, c } = state;
+            const r1 = Math.hypot(x - cVec.x, y - cVec.y);
+            if (r1 < 1e-3) return 1e4;
+
+            let V = Q / r1;
+            if (c > 1e-4) {
+                const r2 = Math.hypot(x - imagePos.x, y - imagePos.y);
+                V += qPrime / r2;
+            } else {
+                V -= Q / a; // Constant potential from boundary when c = 0
+            }
+            return V;
+        }
+
+        // Cavity Electric Field Vector E(r)
+        function getCavityField(x, y, state) {
+            const { cVec, qPrime, imagePos, c } = state;
+            const dx1 = x - cVec.x;
+            const dy1 = y - cVec.y;
+            const r1_sq = dx1 * dx1 + dy1 * dy1;
+            const r1 = Math.sqrt(r1_sq);
+
+            if (r1 < 1e-3) return { Ex: 0, Ey: 0 };
+
+            let Ex = (Q * dx1) / (r1_sq * r1);
+            let Ey = (Q * dy1) / (r1_sq * r1);
+
+            if (c > 1e-4) {
+                const dx2 = x - imagePos.x;
+                const dy2 = y - imagePos.y;
+                const r2_sq = dx2 * dx2 + dy2 * dy2;
+                const r2 = Math.sqrt(r2_sq);
+
+                Ex += (qPrime * dx2) / (r2_sq * r2);
+                Ey += (qPrime * dy2) / (r2_sq * r2);
+            }
+
+            return { Ex, Ey };
+        }
+
+        // Exact Inner Surface Induced Charge Density sigma(theta) (Inside Mode)
+        function getInnerSurfaceChargeDensity(thetaAngle, c) {
+            const effC = Math.min(c, a - 0.2);
+            const denom = Math.pow(a * a + effC * effC - 2 * a * effC * Math.cos(thetaAngle), 1.5);
+            if (denom < 1e-6) return 0;
+            return (-Q / (4 * Math.PI * a)) * (a * a - effC * effC) / denom;
+        }
+
+        // Exact Outer Surface Induced Charge Density sigma(theta) (Outside Mode)
+        function getOutsideSurfaceChargeDensity(thetaAngle, dVal) {
+            const denom = Math.pow(b * b + dVal * dVal - 2 * b * dVal * Math.cos(thetaAngle), 1.5);
+            if (denom < 1e-6) return 0;
+            const termDipole = (dVal * dVal - b * b) / denom;
+            if (isGrounded) {
+                return (-Q / (4 * Math.PI * b)) * termDipole;
+            } else {
+                return (Q / (4 * Math.PI * b)) * ((1 / dVal) - termDipole);
+            }
+        }
+
+        // Field of External Point Charge +Q (Everywhere in space)
+        function getOutsideFieldQ(x, y, cVec) {
+            const dx = x - cVec.x;
+            const dy = y - cVec.y;
+            const r_sq = dx * dx + dy * dy;
+            const r = Math.sqrt(r_sq);
+            if (r < 1e-3) return { Ex: 0, Ey: 0 };
+            return {
+                Ex: (Q * dx) / (r_sq * r),
+                Ey: (Q * dy) / (r_sq * r)
+            };
+        }
+
+        // Field of Induced Charges on Spherical Conductor (Outside Mode)
+        function getOutsideFieldInd(x, y, state) {
+            const r = Math.hypot(x, y);
+            // Inside the conductor (r < b), electrostatic equilibrium dictates:
+            // E_ind(r) = -E_Q(r) everywhere!
+            if (r < b) {
+                const fQ = getOutsideFieldQ(x, y, state.cVec);
+                return { Ex: -fQ.Ex, Ey: -fQ.Ey };
+            }
+
+            // Outside the conductor (r >= b), field is represented by image charges:
+            // q' at d' and q0 at origin
+            const { imagePos, qPrime, q0 } = state;
+            let Ex = 0;
+            let Ey = 0;
+
+            // Contribution from q'
+            const dx1 = x - imagePos.x;
+            const dy1 = y - imagePos.y;
+            const r1_sq = dx1 * dx1 + dy1 * dy1;
+            const r1 = Math.sqrt(r1_sq);
+            if (r1 > 1e-3) {
+                Ex += (qPrime * dx1) / (r1_sq * r1);
+                Ey += (qPrime * dy1) / (r1_sq * r1);
+            }
+
+            // Contribution from center q0 (if isolated)
+            if (!isGrounded && q0) {
+                const r0_sq = x * x + y * y;
+                const r0 = Math.sqrt(r0_sq);
+                if (r0 > 1e-3) {
+                    Ex += (q0 * x) / (r0_sq * r0);
+                    Ey += (q0 * y) / (r0_sq * r0);
+                }
+            }
+
+            return { Ex, Ey };
+        }
+
+        // Total Electric Field in Outside Mode (Superposition of Q and Induced)
+        function getOutsideFieldTotal(x, y, state) {
+            const r = Math.hypot(x, y);
+            // Inside the conductor, total field is identically ZERO!
+            if (r < b) {
+                return { Ex: 0, Ey: 0 };
+            }
+            const fQ = getOutsideFieldQ(x, y, state.cVec);
+            const fInd = getOutsideFieldInd(x, y, state);
+            return {
+                Ex: fQ.Ex + fInd.Ex,
+                Ey: fQ.Ey + fInd.Ey
+            };
+        }
+
+        // Convert Screen Coordinates to Simulation World Coordinates
+        function screenToWorldPos(screenX, screenY) {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = screenX - rect.left;
+            const canvasY = screenY - rect.top;
+            const centerX = rect.width / 2 + panOffset.x;
+            const centerY = rect.height / 2 + panOffset.y;
+
+            return {
+                x: (canvasX - centerX) / scale,
+                y: (canvasY - centerY) / scale
+            };
+        }
+
+        function syncChargeFromCoords(wx, wy) {
+            const dist = Math.hypot(wx, wy);
+            const angle = Math.atan2(wy, wx);
+
+            if (simMode === 'inside') {
+                const maxR = a - 10;
+                if (dist <= maxR) {
+                    chargePos = { x: wx, y: wy };
+                } else {
+                    chargePos = { x: Math.cos(angle) * maxR, y: Math.sin(angle) * maxR };
+                }
+                const currentC = Math.hypot(chargePos.x, chargePos.y);
+                const ratio = currentC / a;
+                sliderC.value = ratio.toFixed(2);
+                labelC.textContent = ratio.toFixed(2);
+            } else {
+                // Outside mode: clamp charge to stay outside conductor sphere
+                const minR = b + 14;
+                const maxR = b * 3.4;
+                const clampedDist = Math.max(minR, Math.min(dist, maxR));
+                chargePos = { x: Math.cos(angle) * clampedDist, y: Math.sin(angle) * clampedDist };
+                const ratio = clampedDist / b;
+                sliderC.value = ratio.toFixed(2);
+                labelC.textContent = ratio.toFixed(2);
+            }
+        }
+
+        // Mouse and Touch Event Listeners
+        canvas.addEventListener('mousedown', (e) => {
+            const wPos = screenToWorldPos(e.clientX, e.clientY);
+            const distToCharge = Math.hypot(wPos.x - chargePos.x, wPos.y - chargePos.y);
+
+            if (distToCharge < 30 / scale) {
+                isDraggingCharge = true;
+                if (dragHint) dragHint.style.opacity = '0';
+            } else {
+                isPanning = true;
+                startPanPos = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const wPos = screenToWorldPos(e.clientX, e.clientY);
+            mouseWorldPos = wPos;
+            const rMouse = Math.hypot(wPos.x, wPos.y);
+            isMouseInsideSphere = (rMouse < b);
+
+            if (isDraggingCharge) {
+                syncChargeFromCoords(wPos.x, wPos.y);
+            } else if (isPanning) {
+                panOffset.x = e.clientX - startPanPos.x;
+                panOffset.y = e.clientY - startPanPos.y;
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isMouseInsideSphere = false;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDraggingCharge = false;
+            isPanning = false;
+        });
+
+        // Mouse Wheel for Zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            scale = Math.min(Math.max(0.4, scale * zoomFactor), 4.0);
+            valZoom.textContent = `${Math.round(scale * 100)}%`;
+        }, { passive: false });
+
+        // Touch Interaction (Single touch drag, Two-finger pinch-to-zoom)
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const wPos = screenToWorldPos(touch.clientX, touch.clientY);
+                const distToCharge = Math.hypot(wPos.x - chargePos.x, wPos.y - chargePos.y);
+
+                if (distToCharge < 38 / scale) {
+                    isDraggingCharge = true;
+                    if (dragHint) dragHint.style.opacity = '0';
+                } else {
+                    isPanning = true;
+                    startPanPos = { x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y };
+                }
+            } else if (e.touches.length === 2) {
+                isDraggingCharge = false;
+                isPanning = false;
+                initialPinchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialScale = scale;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                if (isDraggingCharge) {
+                    const wPos = screenToWorldPos(touch.clientX, touch.clientY);
+                    syncChargeFromCoords(wPos.x, wPos.y);
+                } else if (isPanning) {
+                    panOffset.x = touch.clientX - startPanPos.x;
+                    panOffset.y = touch.clientY - startPanPos.y;
+                }
+            } else if (e.touches.length === 2 && initialPinchDist) {
+                const currentDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const zoomFactor = currentDist / initialPinchDist;
+                scale = Math.min(Math.max(0.4, initialScale * zoomFactor), 4.0);
+                valZoom.textContent = `${Math.round(scale * 100)}%`;
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', () => {
+            isDraggingCharge = false;
+            isPanning = false;
+        });
+
+        // UI Controls & Sliders Wiring
+        sliderC.addEventListener('input', (e) => {
+            const ratio = parseFloat(e.target.value);
+            labelC.textContent = ratio.toFixed(2);
+            const currentAngle = Math.atan2(chargePos.y, chargePos.x) || 0;
+            const targetDist = (simMode === 'inside') ? ratio * a : ratio * b;
+            chargePos = {
+                x: targetDist * Math.cos(currentAngle),
+                y: targetDist * Math.sin(currentAngle)
+            };
+        });
+
+        sliderA.addEventListener('input', (e) => {
+            a = parseFloat(e.target.value);
+            if (b <= a + 25) {
+                b = a + 30;
+                sliderB.value = b;
+                labelB.textContent = `${b} px`;
+            }
+            labelA.textContent = `${a} px`;
+
+            // Constrain charge position within new cavity
+            const c = Math.hypot(chargePos.x, chargePos.y);
+            if (c > a - 10) {
+                const angle = Math.atan2(chargePos.y, chargePos.x);
+                chargePos = { x: Math.cos(angle) * (a - 10), y: Math.sin(angle) * (a - 10) };
+            }
+            const ratio = Math.hypot(chargePos.x, chargePos.y) / a;
+            sliderC.value = ratio.toFixed(2);
+            labelC.textContent = ratio.toFixed(2);
+        });
+
+        sliderB.addEventListener('input', (e) => {
+            b = parseFloat(e.target.value);
+            if (simMode === 'inside') {
+                if (b <= a + 25) {
+                    a = b - 30;
+                    sliderA.value = a;
+                    labelA.textContent = `${a} px`;
+                }
+            } else {
+                // In outside mode, keep external charge outside the expanded sphere
+                const d = Math.hypot(chargePos.x, chargePos.y);
+                if (d < b + 15) {
+                    const angle = Math.atan2(chargePos.y, chargePos.x);
+                    chargePos = { x: Math.cos(angle) * (b + 15), y: Math.sin(angle) * (b + 15) };
+                    sliderC.value = ((b + 15) / b).toFixed(2);
+                    labelC.textContent = sliderC.value;
+                }
+            }
+            labelB.textContent = `${b} px`;
+        });
+
+        sliderLines.addEventListener('input', (e) => {
+            numFieldLines = parseInt(e.target.value);
+            labelLines.textContent = `${numFieldLines} 條`;
+        });
+
+        sliderContours.addEventListener('input', (e) => {
+            numEquiContours = parseInt(e.target.value);
+            labelContours.textContent = `${numEquiContours} 圈`;
+        });
+
+        sliderEquiScale.addEventListener('input', (e) => {
+            equiScaleMultiplier = parseFloat(e.target.value);
+            labelEquiScale.textContent = `${equiScaleMultiplier.toFixed(1)}x`;
+        });
+
+        sliderSymbolScale.addEventListener('input', (e) => {
+            symbolScaleMultiplier = parseFloat(e.target.value);
+            labelSymbolScale.textContent = `${symbolScaleMultiplier.toFixed(1)}x`;
+        });
+
+        sliderOuterReach.addEventListener('input', (e) => {
+            outerReachMultiplier = parseInt(e.target.value);
+            labelOuterReach.textContent = outerReachMultiplier === 4 ? "全域延伸 (邊界)" : `${(1 + outerReachMultiplier * 0.5).toFixed(1)}x 半徑`;
+        });
+
+        btnCenterCharge.addEventListener('click', () => {
+            if (simMode === 'inside') {
+                chargePos = { x: 0, y: 0 };
+                sliderC.value = "0";
+                labelC.textContent = "0.00";
+            } else {
+                chargePos = { x: b * 1.55, y: 0 };
+                sliderC.value = "1.55";
+                labelC.textContent = "1.55";
+            }
+        });
+
+        btnResetView.addEventListener('click', () => {
+            scale = 1.0;
+            panOffset = { x: 0, y: 0 };
+            valZoom.textContent = "100%";
+        });
+
+        btnToggleGround.addEventListener('click', () => {
+            isGrounded = !isGrounded;
+            if (isGrounded) {
+                groundStatusText.textContent = (simMode === 'inside') ? "球殼：接地 (V = 0)" : "導體球：接地 (V = 0)";
+                hudStateBadge.textContent = (simMode === 'inside') ? "外壁接地" : "導體球接地";
+                hudStateBadge.className = "text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-600/40 font-sans";
+                groundIcon.className = "fa-solid fa-plug text-cyan-400";
+            } else {
+                groundStatusText.textContent = (simMode === 'inside') ? "球殼：中性孤立" : "導體球：中性孤立";
+                hudStateBadge.textContent = (simMode === 'inside') ? "孤立球殼" : "孤立導體球";
+                hudStateBadge.className = (simMode === 'inside')
+                    ? "text-[9px] uppercase px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 border border-blue-600/40 font-sans"
+                    : "text-[9px] uppercase px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-600/40 font-sans";
+                groundIcon.className = "fa-solid fa-earth-americas text-emerald-400";
+            }
+        });
+
+        // Mode Switching and Outside Controls Event Wiring
+        btnModeInside.addEventListener('click', () => setSimMode('inside'));
+        btnModeOutside.addEventListener('click', () => setSimMode('outside'));
+
+        chkShowTotalField.addEventListener('change', (e) => {
+            showOutsideTotal = e.target.checked;
+        });
+        chkShowQField.addEventListener('change', (e) => {
+            showOutsideQ = e.target.checked;
+        });
+        chkShowIndField.addEventListener('change', (e) => {
+            showOutsideInd = e.target.checked;
+        });
+
+        chkOutsideImages.addEventListener('change', (e) => {
+            showOutsideImages = e.target.checked;
+        });
+
+
+        // ==========================================
+        // 3. High-Precision Numerical Integrator for Field Lines
+        // ==========================================
+        /**
+         * Trace cavity electric field line from start point using Runge-Kutta 4 (RK4)
+         * - Solves the premature cutoff issue when charge deviates from center:
+         *   1. Termination threshold lowered to 1e-12 (instead of 1e-5), so lines travelling through weak field regions never abort mid-way.
+         *   2. Max steps increased to 1200 with adaptive step sizing, ensuring field lines reach across the entire cavity diameter.
+         *   3. Smooth geometric snapping to cavity boundary r = a, leaving zero gaps.
+         */
+        function traceCavityFieldLine(startX, startY, state, aVal) {
+            const points = [{ x: startX, y: startY }];
+            let x = startX;
+            let y = startY;
+            const maxSteps = 1200;
+
+            for (let step = 0; step < maxSteps; step++) {
+                const r = Math.hypot(x, y);
+
+                // Check arrival at cavity wall boundary
+                if (r >= aVal - 1.5) {
+                    const endAngle = Math.atan2(y, x);
+                    points.push({ x: aVal * Math.cos(endAngle), y: aVal * Math.sin(endAngle) });
+                    break;
+                }
+
+                // RK4 Stage 1
+                const f1 = getCavityField(x, y, state);
+                const len1 = Math.hypot(f1.Ex, f1.Ey);
+                if (len1 < 1e-12 || !isFinite(len1)) break;
+
+                // Adaptive step size: finer near charge for curvature, larger in open cavity
+                const distToCharge = Math.hypot(x - state.cVec.x, y - state.cVec.y);
+                let ds = 2.6;
+                if (distToCharge < 22) ds = 1.3;
+                else if (distToCharge > 60 && r < aVal - 18) ds = 3.6;
+
+                const k1x = (f1.Ex / len1) * ds;
+                const k1y = (f1.Ey / len1) * ds;
+
+                // RK4 Stage 2
+                const mid1X = x + k1x * 0.5;
+                const mid1Y = y + k1y * 0.5;
+                const f2 = getCavityField(mid1X, mid1Y, state);
+                const len2 = Math.hypot(f2.Ex, f2.Ey);
+                if (len2 < 1e-12 || !isFinite(len2)) break;
+                const k2x = (f2.Ex / len2) * ds;
+                const k2y = (f2.Ey / len2) * ds;
+
+                // RK4 Stage 3
+                const mid2X = x + k2x * 0.5;
+                const mid2Y = y + k2y * 0.5;
+                const f3 = getCavityField(mid2X, mid2Y, state);
+                const len3 = Math.hypot(f3.Ex, f3.Ey);
+                if (len3 < 1e-12 || !isFinite(len3)) break;
+                const k3x = (f3.Ex / len3) * ds;
+                const k3y = (f3.Ey / len3) * ds;
+
+                // RK4 Stage 4
+                const endX = x + k3x;
+                const endY = y + k3y;
+                const f4 = getCavityField(endX, endY, state);
+                const len4 = Math.hypot(f4.Ex, f4.Ey);
+                if (len4 < 1e-12 || !isFinite(len4)) break;
+                const k4x = (f4.Ex / len4) * ds;
+                const k4y = (f4.Ey / len4) * ds;
+
+                // Weighted combination
+                x += (k1x + 2 * k2x + 2 * k3x + k4x) / 6;
+                y += (k1y + 2 * k2y + 2 * k3y + k4y) / 6;
+
+                points.push({ x, y });
+            }
+
+            return points;
+        }
+
+        /**
+         * Trace induced field line outside spherical conductor
+         * - Never allows stepping into conductor interior (r <= bVal) to prevent boundary folding
+         * - Supports reaching full viewport domain (viewReach)
+         * - Uses adaptive step near surface to escape weak-field zone without premature termination
+         */
+        function traceOutsideInducedFieldLine(startX, startY, state, bVal, maxSteps = 1600, direction = 1, viewReach = 2500) {
+            const points = [{ x: startX, y: startY }];
+            let x = startX;
+            let y = startY;
+
+            for (let step = 0; step < maxSteps; step++) {
+                const r = Math.hypot(x, y);
+
+                // Snap to sphere surface when close enough
+                if (step > 0 && r <= bVal + 1.0) {
+                    const angle = Math.atan2(y, x);
+                    points.push({ x: bVal * Math.cos(angle), y: bVal * Math.sin(angle) });
+                    break;
+                }
+                if (r > viewReach) break;
+
+                const f = getOutsideFieldInd(x, y, state);
+                const len = Math.hypot(f.Ex, f.Ey);
+
+                // Relaxed threshold near surface to avoid premature stop
+                const minLen = step < 12 ? 1e-9 : 1e-11;
+                if (len < minLen || !isFinite(len)) break;
+
+                // Adaptive step: shrink near surface so we never overshoot past bVal
+                const distToSurface = r - bVal;
+                let ds;
+                if (step < 6) {
+                    ds = 5.5;      // escape the near-surface weak-field zone quickly
+                } else {
+                    // ds < distToSurface ensures we can't jump through the sphere
+                    ds = Math.min(3.2, Math.max(0.4, distToSurface * 0.65));
+                }
+                x += direction * (f.Ex / len) * ds;
+                y += direction * (f.Ey / len) * ds;
+                points.push({ x, y });
+            }
+            return points;
+        }
+
+        /**
+         * Trace total field line outside spherical conductor using RK4
+         * - Extends through the entire viewport domain (viewReach)
+         * - Seamless boundary snapping to r = bVal
+         */
+        function traceOutsideTotalFieldLine(startX, startY, state, bVal, maxSteps = 1600, direction = 1, viewReach = 2500) {
+            const points = [{ x: startX, y: startY }];
+            let x = startX;
+            let y = startY;
+
+            for (let step = 0; step < maxSteps; step++) {
+                const r = Math.hypot(x, y);
+
+                // Terminate if reached conductor surface r <= b
+                if (step > 0 && r <= bVal + 1.0) {
+                    const angle = Math.atan2(y, x);
+                    points.push({ x: bVal * Math.cos(angle), y: bVal * Math.sin(angle) });
+                    break;
+                }
+
+                // Terminate if reached viewport domain boundary
+                if (r > viewReach) break;
+
+                // Adaptive step: shrink near surface so we never overshoot past bVal
+                const distToSurface = r - bVal;
+                const ds = Math.min(3.2, Math.max(0.4, distToSurface * 0.65));
+
+                // RK4 Stage 1
+                const f1 = getOutsideFieldTotal(x, y, state);
+                const len1 = Math.hypot(f1.Ex, f1.Ey);
+                if (len1 < 1e-12 || !isFinite(len1)) break;
+
+                const k1x = direction * (f1.Ex / len1) * ds;
+                const k1y = direction * (f1.Ey / len1) * ds;
+
+                // RK4 Stage 2
+                const mid1X = x + k1x * 0.5;
+                const mid1Y = y + k1y * 0.5;
+                const f2 = getOutsideFieldTotal(mid1X, mid1Y, state);
+                const len2 = Math.hypot(f2.Ex, f2.Ey);
+                if (len2 < 1e-12 || !isFinite(len2)) break;
+                const k2x = direction * (f2.Ex / len2) * ds;
+                const k2y = direction * (f2.Ey / len2) * ds;
+
+                // RK4 Stage 3
+                const mid2X = x + k2x * 0.5;
+                const mid2Y = y + k2y * 0.5;
+                const f3 = getOutsideFieldTotal(mid2X, mid2Y, state);
+                const len3 = Math.hypot(f3.Ex, f3.Ey);
+                if (len3 < 1e-12 || !isFinite(len3)) break;
+                const k3x = direction * (f3.Ex / len3) * ds;
+                const k3y = direction * (f3.Ey / len3) * ds;
+
+                // RK4 Stage 4
+                const endX = x + k3x;
+                const endY = y + k3y;
+                const f4 = getOutsideFieldTotal(endX, endY, state);
+                const len4 = Math.hypot(f4.Ex, f4.Ey);
+                if (len4 < 1e-12 || !isFinite(len4)) break;
+                const k4x = direction * (f4.Ex / len4) * ds;
+                const k4y = direction * (f4.Ey / len4) * ds;
+
+                x += (k1x + 2 * k2x + 2 * k3x + k4x) / 6;
+                y += (k1y + 2 * k2y + 2 * k3y + k4y) / 6;
+
+                points.push({ x, y });
+            }
+
+            return points;
+        }
+
+
+        // ==========================================
+        // 4. Rendering Functions for Canvas
+        // ==========================================
+
+        // Conductor Spherical Shell (Metallic Body with a < r < b)
+        function drawConductorShell() {
+            ctx.save();
+
+            // Shell Wall (a <= r <= b)
+            ctx.beginPath();
+            ctx.arc(0, 0, b, 0, Math.PI * 2);
+            ctx.arc(0, 0, a, 0, Math.PI * 2, true);
+
+            const grad = ctx.createRadialGradient(0, 0, a, 0, 0, b);
+            grad.addColorStop(0, 'rgba(30, 41, 59, 0.95)');
+            grad.addColorStop(0.5, 'rgba(51, 65, 85, 0.95)');
+            grad.addColorStop(1, 'rgba(30, 41, 59, 0.95)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Inner Boundary r = a
+            ctx.lineWidth = 2.5 / scale;
+            ctx.strokeStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.arc(0, 0, a, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Outer Boundary r = b
+            ctx.strokeStyle = isGrounded ? '#10b981' : '#818cf8';
+            ctx.beginPath();
+            ctx.arc(0, 0, b, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Conductor Internal Label E = 0 (Scales with font slider)
+            const e0FontSize = Math.round(11 * symbolScaleMultiplier);
+            ctx.font = `bold ${e0FontSize / scale}px monospace`;
+            ctx.fillStyle = 'rgba(52, 211, 153, 0.85)';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const midR = (a + b) / 2;
+            const textAngle = -Math.PI / 4;
+            ctx.fillText("E = 0 (導體內部)", Math.cos(textAngle) * midR, Math.sin(textAngle) * midR);
+
+            // Grounding Symbol or Uniform Outer Induced Positive Charges
+            if (isGrounded) {
+                // Grounding Symbol at Bottom of Outer Shell (Scales with symbol slider)
+                const gndScale = Math.min(2.0, Math.max(1.0, symbolScaleMultiplier));
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = (2 * gndScale) / scale;
+                ctx.beginPath();
+                ctx.moveTo(0, b);
+                ctx.lineTo(0, b + (14 * gndScale) / scale);
+                ctx.moveTo(-10 * gndScale / scale, b + (14 * gndScale) / scale);
+                ctx.lineTo(10 * gndScale / scale, b + (14 * gndScale) / scale);
+                ctx.moveTo(-6 * gndScale / scale, b + (18 * gndScale) / scale);
+                ctx.lineTo(6 * gndScale / scale, b + (18 * gndScale) / scale);
+                ctx.moveTo(-2 * gndScale / scale, b + (22 * gndScale) / scale);
+                ctx.lineTo(2 * gndScale / scale, b + (22 * gndScale) / scale);
+                ctx.stroke();
+
+                const gndFontSize = Math.round(10 * symbolScaleMultiplier);
+                ctx.font = `bold ${gndFontSize / scale}px sans-serif`;
+                ctx.fillStyle = '#34d399';
+                ctx.fillText("⏚ 接地 (V=0)", 0, b + (18 + 14 * gndScale) / scale);
+            } else {
+                // Outer uniform positive charges with luminous cyan neon halos and crisp white +
+                const outerCount = 36;
+                const offsetDist = b + (9 / scale);
+                const plusFontSize = Math.round(10.5 * symbolScaleMultiplier);
+                const nodeRadius = 3.2 / scale; // Fixed circle size, decoupled from symbolScaleMultiplier
+
+                for (let i = 0; i < outerCount; i++) {
+                    const ang = (i / outerCount) * Math.PI * 2;
+                    const px = Math.cos(ang) * offsetDist;
+                    const py = Math.sin(ang) * offsetDist;
+
+                    // Luminous cyan halo
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(6, 182, 212, 0.45)';
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(px, py, nodeRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Bold White + Symbol
+                    ctx.fillStyle = '#ecfeff';
+                    ctx.font = `bold ${plusFontSize / scale}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText("+", px, py);
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // Draw All Electric Field Lines (Cavity & Far Outer Fields)
+        function drawElectricFieldLines(state) {
+            const { cVec } = state;
+            const rect = canvas.getBoundingClientRect();
+
+            // 1. Cavity Electric Field Lines
+            if (chkFieldLines.checked) {
+                ctx.save();
+                ctx.lineWidth = 1.5 / scale;
+                ctx.strokeStyle = '#38bdf8';
+
+                const startR = 8;
+                for (let i = 0; i < numFieldLines; i++) {
+                    const angle = (i / numFieldLines) * Math.PI * 2;
+                    const px = cVec.x + Math.cos(angle) * startR;
+                    const py = cVec.y + Math.sin(angle) * startR;
+
+                    const linePoints = traceCavityFieldLine(px, py, state, a);
+                    if (linePoints.length < 2) continue;
+
+                    ctx.beginPath();
+                    ctx.moveTo(linePoints[0].x, linePoints[0].y);
+                    for (let j = 1; j < linePoints.length; j++) {
+                        ctx.lineTo(linePoints[j].x, linePoints[j].y);
+                    }
+                    ctx.stroke();
+
+                    // Direction Arrow at Midpoint of Field Line (Scales with symbol slider)
+                    if (linePoints.length > 8) {
+                        const midIdx = Math.floor(linePoints.length * 0.45);
+                        const p1 = linePoints[midIdx];
+                        const p2 = linePoints[midIdx + 1];
+                        if (p1 && p2) {
+                            const arrAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                            drawSmallArrowHead(p2.x, p2.y, arrAngle, '#38bdf8', (6.5 * symbolScaleMultiplier) / scale);
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // 2. Outer Electric Field Lines (Extends far out towards viewport boundaries)
+            if (chkOuterField.checked && !isGrounded) {
+                ctx.save();
+                ctx.strokeStyle = '#818cf8';
+                ctx.lineWidth = 1.4 / scale;
+
+                // Calculate far extension distance
+                let reachDist = b + 120;
+                if (outerReachMultiplier === 4) {
+                    // Full viewport boundary reach
+                    reachDist = Math.max(
+                        rect.width / (2 * scale) + Math.abs(panOffset.x / scale),
+                        rect.height / (2 * scale) + Math.abs(panOffset.y / scale)
+                    ) * 1.5;
+                } else {
+                    reachDist = b + 80 * outerReachMultiplier;
+                }
+
+                const extLines = Math.max(16, numFieldLines);
+                for (let i = 0; i < extLines; i++) {
+                    const ang = (i / extLines) * Math.PI * 2;
+                    const sx = Math.cos(ang) * b;
+                    const sy = Math.sin(ang) * b;
+                    const ex = Math.cos(ang) * reachDist;
+                    const ey = Math.sin(ang) * reachDist;
+
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(ex, ey);
+                    ctx.stroke();
+
+                    // Direction Arrow (Scales with symbol slider)
+                    const arrowR = (b + reachDist) * 0.5;
+                    const ax = Math.cos(ang) * arrowR;
+                    const ay = Math.sin(ang) * arrowR;
+                    drawSmallArrowHead(ax, ay, ang, '#818cf8', (7.5 * symbolScaleMultiplier) / scale);
+                }
+                ctx.restore();
+            }
+        }
+
+        // Draw Small Arrow Head along Field Lines
+        function drawSmallArrowHead(x, y, angle, color, size) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - size * Math.cos(angle - Math.PI / 6), y - size * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x - size * Math.cos(angle + Math.PI / 6), y - size * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        /**
+         * Draw a vector label with an arrow on top (traditional notation).
+         * Supports optional align ('left' | 'center' | 'right').
+         * e.g. drawVecLabel('F', ' (淨吸引力)', x, y, '#34d399', 11, 'center')
+         */
+        function drawVecLabel(letter, suffix, x, y, color, fontSize, align = 'left') {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.textBaseline = 'middle';
+
+            // Measure dimensions
+            ctx.font = `bold ${fontSize / scale}px sans-serif`;
+            const lw = ctx.measureText(letter).width;
+            ctx.font = `${fontSize * 0.9 / scale}px sans-serif`;
+            const sw = ctx.measureText(suffix).width;
+            const totalWidth = lw + (suffix ? fontSize * 0.1 / scale + sw : 0);
+
+            let startX = x;
+            if (align === 'center') {
+                startX = x - totalWidth * 0.5;
+            } else if (align === 'right') {
+                startX = x - totalWidth;
+            }
+
+            // Draw arrow above the letter (smaller, centered over letter)
+            ctx.font = `${fontSize * 0.65 / scale}px sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.fillText('\u2192', startX + lw * 0.05, y - fontSize * 0.72 / scale);
+
+            // Draw main letter
+            ctx.font = `bold ${fontSize / scale}px sans-serif`;
+            ctx.fillText(letter, startX, y);
+
+            // Draw suffix
+            if (suffix) {
+                ctx.font = `${fontSize * 0.9 / scale}px sans-serif`;
+                ctx.fillText(suffix, startX + lw + fontSize * 0.1 / scale, y);
+            }
+
+            ctx.restore();
+        }
+
+        // Smooth Equipotential Contour Lines (Marching Squares)
+        function drawEquipotentials(state) {
+            ctx.save();
+            ctx.lineWidth = (1.2 * Math.min(1.8, symbolScaleMultiplier)) / scale;
+            const levels = [];
+            const numLevels = numEquiContours;
+
+            // Physical equipotential distribution:
+            // Conductor inner wall r = a is the zero-potential reference V = 0.
+            // Near the point charge +Q, V -> +inf.
+            // equiScaleMultiplier controls how close the outermost contour expands toward the wall r = a:
+            // When multiplier is 1.0 -> coverage ~ 76% of radius
+            // When multiplier is 2.0 -> coverage ~ 89% of radius
+            // When multiplier is 3.0 -> coverage ~ 97.5% of radius (huge rings filling the entire cavity!)
+            const fMax = Math.min(0.975, 0.62 + (equiScaleMultiplier * 0.12));
+            const fMin = 0.12;
+
+            for (let i = 1; i <= numLevels; i++) {
+                const t = i / (numLevels + 0.5);
+                const f = fMin + (fMax - fMin) * Math.pow(t, 0.88);
+                // Potential V corresponding to radial distance f * a
+                const V_target = (Q / a) * (1 / f - 1);
+                levels.push(V_target);
+            }
+
+            const step = 5 / scale;
+            for (let l = 0; l < levels.length; l++) {
+                const targetV = levels[l];
+                // Hue: Golden amber at the outermost large ring, transitioning to cyan and violet at the innermost core
+                const hue = 38 + ((levels.length - 1 - l) / Math.max(1, levels.length - 1)) * 165;
+                ctx.strokeStyle = `hsla(${hue}, 92%, 60%, 0.78)`;
+
+                for (let x = -a; x < a; x += step) {
+                    for (let y = -a; y < a; y += step) {
+                        const x2 = x + step;
+                        const y2 = y + step;
+
+                        if (Math.hypot(x, y) >= a - 1 || Math.hypot(x2, y) >= a - 1 ||
+                            Math.hypot(x, y2) >= a - 1 || Math.hypot(x2, y2) >= a - 1) continue;
+
+                        const v1 = getCavityPotential(x, y, state);
+                        const v2 = getCavityPotential(x2, y, state);
+                        const v3 = getCavityPotential(x2, y2, state);
+                        const v4 = getCavityPotential(x, y2, state);
+
+                        drawContourCell(x, y, step, v1, v2, v3, v4, targetV);
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawContourCell(x, y, step, v1, v2, v3, v4, targetV) {
+            let code = 0;
+            if (v1 >= targetV) code |= 1;
+            if (v2 >= targetV) code |= 2;
+            if (v3 >= targetV) code |= 4;
+            if (v4 >= targetV) code |= 8;
+            if (code === 0 || code === 15) return;
+
+            const lerp = (valA, valB, posA, posB) => {
+                if (Math.abs(valB - valA) < 1e-6) return (posA + posB) / 2;
+                return posA + (targetV - valA) * (posB - posA) / (valB - valA);
+            };
+
+            const top = { x: lerp(v1, v2, x, x + step), y: y };
+            const right = { x: x + step, y: lerp(v2, v3, y, y + step) };
+            const bottom = { x: lerp(v4, v3, x, x + step), y: y + step };
+            const left = { x: x, y: lerp(v1, v4, y, y + step) };
+
+            ctx.beginPath();
+            switch (code) {
+                case 1: case 14: ctx.moveTo(left.x, left.y); ctx.lineTo(top.x, top.y); break;
+                case 2: case 13: ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); break;
+                case 3: case 12: ctx.moveTo(left.x, left.y); ctx.lineTo(right.x, right.y); break;
+                case 4: case 11: ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
+                case 5: ctx.moveTo(left.x, left.y); ctx.lineTo(top.x, top.y); ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
+                case 6: case 9: ctx.moveTo(top.x, top.y); ctx.lineTo(bottom.x, bottom.y); break;
+                case 7: case 8: ctx.moveTo(left.x, left.y); ctx.lineTo(bottom.x, bottom.y); break;
+                case 10: ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); ctx.moveTo(left.x, left.y); ctx.lineTo(bottom.x, bottom.y); break;
+            }
+            ctx.stroke();
+        }
+
+        // Inner Surface Induced Charge Density Visual Distribution
+        function drawInnerSurfaceCharge(state, qAngle) {
+            const { c } = state;
+            const totalNodes = 64;
+            let maxSigma = 0;
+
+            const densities = [];
+            const cumulative = [0];
+
+            for (let i = 0; i < 360; i++) {
+                const rad = (i * Math.PI) / 180;
+                const sigmaVal = Math.abs(getInnerSurfaceChargeDensity(rad, c));
+                densities.push(sigmaVal);
+                if (sigmaVal > maxSigma) maxSigma = sigmaVal;
+                cumulative.push(cumulative[i] + sigmaVal);
+            }
+
+            const totalSum = cumulative[360];
+
+            ctx.save();
+            for (let i = 0; i < totalNodes; i++) {
+                const targetSum = (i / totalNodes) * totalSum;
+                let idx = cumulative.findIndex(val => val >= targetSum);
+                if (idx < 0) idx = 0;
+
+                const absAngle = (idx * Math.PI) / 180 + qAngle;
+                const sigmaVal = densities[idx % 360];
+                const intensity = Math.min(1.0, sigmaVal * 2500);
+
+                const px = Math.cos(absAngle) * (a - 7 / scale);
+                const py = Math.sin(absAngle) * (a - 7 / scale);
+
+                // Fixed node circle radius (independent of symbol scale slider)
+                const nodeRadius = (2.4 + intensity * 3.2) / scale;
+                ctx.fillStyle = `rgba(244, 63, 94, ${0.45 + intensity * 0.55})`;
+                ctx.beginPath();
+                ctx.arc(px, py, nodeRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Minus Symbol '-' (Scales with symbol slider for far projection visibility)
+                ctx.fillStyle = '#ffe4e6';
+                const minusFontSize = Math.round(Math.max(10, 12 * (0.75 + intensity * 0.45)) * symbolScaleMultiplier);
+                ctx.font = `bold ${minusFontSize / scale}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('-', px, py);
+            }
+            ctx.restore();
+
+            valSigmaMax.textContent = (maxSigma * 1000).toFixed(2);
+        }
+
+        // Virtual Image Charge Node q'
+        function drawImageCharge(state) {
+            const { imagePos, qPrime } = state;
+            if (!isFinite(imagePos.x) || !isFinite(imagePos.y)) return;
+
+            ctx.save();
+
+            // Dashed connection line from origin through +Q to q'
+            ctx.beginPath();
+            ctx.setLineDash([4 / scale, 4 / scale]);
+            ctx.moveTo(state.cVec.x, state.cVec.y);
+            ctx.lineTo(imagePos.x, imagePos.y);
+            ctx.strokeStyle = 'rgba(168, 85, 247, 0.5)';
+            ctx.lineWidth = 1.5 / scale;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Image Charge Node Circle (Fixed radius, does not balloon)
+            const imageR = 8.5 / scale;
+            ctx.beginPath();
+            ctx.arc(imagePos.x, imagePos.y, imageR, 0, Math.PI * 2);
+            ctx.fillStyle = '#a855f7';
+            ctx.shadowColor = '#c084fc';
+            ctx.shadowBlur = 14;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Label (Scales with font slider)
+            const qpFontSize = Math.round(11 * symbolScaleMultiplier);
+            ctx.font = `bold ${qpFontSize / scale}px monospace`;
+            ctx.fillStyle = '#e9d5ff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(`q' = ${qPrime.toFixed(2)} Q`, imagePos.x, imagePos.y - (11 * symbolScaleMultiplier) / scale);
+
+            ctx.restore();
+        }
+
+        // Real Draggable Charge +Q
+        function drawRealCharge(state) {
+            const { cVec } = state;
+
+            ctx.save();
+            // Fixed charge circle radius (independent of symbol scale slider)
+            const chargeR = 12 / scale;
+
+            // Glowing Outer Halo for positive charge emphasis
+            ctx.beginPath();
+            ctx.arc(cVec.x, cVec.y, chargeR + 5 / scale, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+            ctx.fill();
+
+            // Core charge circle
+            ctx.beginPath();
+            ctx.arc(cVec.x, cVec.y, chargeR, 0, Math.PI * 2);
+            ctx.fillStyle = '#f59e0b';
+            ctx.shadowColor = '#fbbf24';
+            ctx.shadowBlur = 18;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.0 / scale;
+            ctx.stroke();
+
+            // Crisp bold white + inside circle
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${13 / scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', cVec.x, cVec.y + 0.5 / scale);
+
+            // Floating +Q Label above charge (Scales with font slider)
+            const qFontSize = Math.round(11.5 * symbolScaleMultiplier);
+            ctx.font = `bold ${qFontSize / scale}px sans-serif`;
+            ctx.fillStyle = '#fde68a';
+            ctx.fillText('+Q', cVec.x, cVec.y - (16 * symbolScaleMultiplier) / scale);
+
+            ctx.restore();
+        }
+
+        // Net Attractive Force Vector F
+        function drawForceVector(state) {
+            const { cVec, c, attractionForce } = state;
+            if (c < 2) return;
+
+            const unitX = cVec.x / c;
+            const unitY = cVec.y / c;
+
+            const forceLen = Math.min(85 * symbolScaleMultiplier, Math.max(14 * symbolScaleMultiplier, attractionForce * 0.45 * symbolScaleMultiplier));
+            const endX = cVec.x + unitX * forceLen;
+            const endY = cVec.y + unitY * forceLen;
+
+            ctx.save();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = (3 * symbolScaleMultiplier) / scale;
+            ctx.beginPath();
+            ctx.moveTo(cVec.x, cVec.y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Arrow Head
+            const arrowAngle = Math.atan2(unitY, unitX);
+            const headLen = (9 * symbolScaleMultiplier) / scale;
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - headLen * Math.cos(arrowAngle - Math.PI / 6), endY - headLen * Math.sin(arrowAngle - Math.PI / 6));
+            ctx.lineTo(endX - headLen * Math.cos(arrowAngle + Math.PI / 6), endY - headLen * Math.sin(arrowAngle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            // Label (vector arrow on top of F, offset downwards perpendicularly to avoid overlapping with +Q label)
+            const fFontSize = Math.round(11 * symbolScaleMultiplier);
+            let perpX = -unitY;
+            let perpY = unitX;
+            if (perpY < 0) {
+                perpX = -perpX;
+                perpY = -perpY;
+            }
+            const labelDist = (17 * symbolScaleMultiplier) / scale;
+            const midX = (cVec.x + endX) * 0.5 + perpX * labelDist;
+            const midY = (cVec.y + endY) * 0.5 + perpY * labelDist;
+            drawVecLabel('F', ' (淨吸引力)', midX, midY, '#34d399', fFontSize, 'center');
+
+            ctx.restore();
+        }
+
+        // ==========================================
+        // Outside Conductor Mode Rendering
+        // ==========================================
+        function drawOutsideMode(state) {
+            const { d, cVec, imagePos, qPrime, q0, attractionForce } = state;
+            const qAngle = Math.atan2(cVec.y, cVec.x);
+            const rect = canvas.getBoundingClientRect();
+
+            // 1. Conductor Sphere Body (r <= b)
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, 0, b, 0, Math.PI * 2);
+            const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, b);
+            grad.addColorStop(0, 'rgba(30, 41, 59, 0.95)');
+            grad.addColorStop(0.7, 'rgba(51, 65, 85, 0.95)');
+            grad.addColorStop(1, 'rgba(30, 41, 59, 0.98)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.lineWidth = 2.5 / scale;
+            ctx.strokeStyle = isGrounded ? '#10b981' : '#818cf8';
+            ctx.stroke();
+
+            // Center Origin Crosshair
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            ctx.lineWidth = 1 / scale;
+            ctx.beginPath();
+            ctx.moveTo(-7 / scale, 0); ctx.lineTo(7 / scale, 0);
+            ctx.moveTo(0, -7 / scale); ctx.lineTo(0, 7 / scale);
+            ctx.stroke();
+
+            // Grounding Symbol if grounded (Scales with symbol slider)
+            if (isGrounded) {
+                const gndScale = Math.min(2.0, Math.max(1.0, symbolScaleMultiplier));
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = (2 * gndScale) / scale;
+                ctx.beginPath();
+                ctx.moveTo(0, b);
+                ctx.lineTo(0, b + (14 * gndScale) / scale);
+                ctx.moveTo(-10 * gndScale / scale, b + (14 * gndScale) / scale);
+                ctx.lineTo(10 * gndScale / scale, b + (14 * gndScale) / scale);
+                ctx.moveTo(-6 * gndScale / scale, b + (18 * gndScale) / scale);
+                ctx.lineTo(6 * gndScale / scale, b + (18 * gndScale) / scale);
+                ctx.moveTo(-2 * gndScale / scale, b + (22 * gndScale) / scale);
+                ctx.lineTo(2 * gndScale / scale, b + (22 * gndScale) / scale);
+                ctx.stroke();
+
+                const gndFontSize = Math.round(10 * symbolScaleMultiplier);
+                ctx.font = `bold ${gndFontSize / scale}px sans-serif`;
+                ctx.fillStyle = '#34d399';
+                ctx.textAlign = 'center';
+                ctx.fillText("⏚ 接地 (V=0)", 0, b + (18 + 14 * gndScale) / scale);
+            }
+            ctx.restore();
+
+            // 2. Field Lines rendering according to toggle checkboxes:
+            // - showOutsideTotal: Real equilibrium total field E_total
+            // - showOutsideQ: External point charge Q Coulomb field
+            // - showOutsideInd: Conductor surface induced charge field
+            // - When both Q and Ind are checked: automatically shows twin-track superposition in conductor interior
+            const sphereSubtendedHalf = Math.asin(Math.min(0.999, b / d));
+            const angleToCenter = qAngle + Math.PI;
+
+            // Full viewport reach distance considering zoom, pan, and charge distance
+            const canvasDiag = Math.hypot(rect.width, rect.height);
+            const viewReach = Math.max(
+                canvasDiag / scale + Math.hypot(panOffset.x, panOffset.y) / scale,
+                d + canvasDiag / scale
+            ) * 2.5;
+
+            // --- 2A. External Point Charge Field (E_Q) ---
+            if (showOutsideQ) {
+                ctx.save();
+                const totalRays = Math.max(24, numFieldLines);
+                const coneFraction = 0.55;
+                const numConeRays = Math.round(totalRays * coneFraction);
+                const numOtherRays = totalRays - numConeRays;
+
+                // When both Q and Induced are active, shift track slightly for clear parallel comparison
+                const isSuperposition = showOutsideQ && showOutsideInd;
+                const trackOffset = isSuperposition ? (2.2 / scale) : 0;
+
+                // 2a-1. Rays pointing towards the conductor sphere
+                for (let i = 0; i < numConeRays; i++) {
+                    const t = (i + 0.5) / numConeRays;
+                    const rayAngle = angleToCenter - sphereSubtendedHalf * 0.94 + t * (2 * sphereSubtendedHalf * 0.94);
+                    const ux = Math.cos(rayAngle);
+                    const uy = Math.sin(rayAngle);
+
+                    const B = 2 * (cVec.x * ux + cVec.y * uy);
+                    const C = d * d - b * b;
+                    const disc = B * B - 4 * C;
+
+                    if (disc > 0) {
+                        const sqrtD = Math.sqrt(disc);
+                        const t1 = (-B - sqrtD) * 0.5; // Entry into sphere
+                        const t2 = (-B + sqrtD) * 0.5; // Exit from sphere
+
+                        const pEntry = { x: cVec.x + ux * t1, y: cVec.y + uy * t1 };
+                        const pExit = { x: cVec.x + ux * t2, y: cVec.y + uy * t2 };
+                        const pFar = { x: cVec.x + ux * viewReach, y: cVec.y + uy * viewReach };
+
+                        // Outside segment before sphere (Air: +Q -> Entry)
+                        ctx.strokeStyle = '#f59e0b';
+                        ctx.lineWidth = 1.5 / scale;
+                        ctx.beginPath();
+                        ctx.moveTo(cVec.x, cVec.y);
+                        ctx.lineTo(pEntry.x, pEntry.y);
+                        ctx.stroke();
+
+                        // Arrow in air approaching sphere
+                        const arrT1 = t1 * 0.45;
+                        drawSmallArrowHead(cVec.x + ux * arrT1, cVec.y + uy * arrT1, rayAngle, '#f59e0b', (6.5 * symbolScaleMultiplier) / scale);
+
+                        // Penetrating segment through conductor interior (Entry -> Exit)
+                        // Amber / Yellow representing external field E_Q passing through (+trackOffset)
+                        const nx = -uy;
+                        const ny = ux;
+                        ctx.strokeStyle = '#fbbf24';
+                        ctx.lineWidth = 1.8 / scale;
+                        ctx.beginPath();
+                        ctx.moveTo(pEntry.x + nx * trackOffset, pEntry.y + ny * trackOffset);
+                        ctx.lineTo(pExit.x + nx * trackOffset, pExit.y + ny * trackOffset);
+                        ctx.stroke();
+
+                        // E_Q direction arrow: pointing along ray (away from +Q)
+                        const midT_Q = t1 + (t2 - t1) * 0.42;
+                        drawSmallArrowHead(cVec.x + ux * midT_Q + nx * trackOffset, cVec.y + uy * midT_Q + ny * trackOffset, rayAngle, '#fbbf24', (7.5 * symbolScaleMultiplier) / scale);
+
+                        // Outside segment after exit: extends all the way to viewport reach
+                        ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)';
+                        ctx.lineWidth = 1.3 / scale;
+                        ctx.beginPath();
+                        ctx.moveTo(pExit.x, pExit.y);
+                        ctx.lineTo(pFar.x, pFar.y);
+                        ctx.stroke();
+
+                        const arrT2 = t2 + (70 * symbolScaleMultiplier) / scale;
+                        drawSmallArrowHead(cVec.x + ux * arrT2, cVec.y + uy * arrT2, rayAngle, '#f59e0b', (6.5 * symbolScaleMultiplier) / scale);
+                        if (viewReach > t2 + 350 / scale) {
+                            const arrT3 = t2 + 280 / scale;
+                            drawSmallArrowHead(cVec.x + ux * arrT3, cVec.y + uy * arrT3, rayAngle, 'rgba(245, 158, 11, 0.7)', (6.5 * symbolScaleMultiplier) / scale);
+                        }
+                    }
+                }
+
+                // 2a-2. Rays that miss the sphere (radiating away into space out to viewport reach)
+                const spanMiss = 2 * Math.PI - 2 * sphereSubtendedHalf;
+                for (let i = 0; i < numOtherRays; i++) {
+                    const t = (i + 0.5) / numOtherRays;
+                    const rayAngle = angleToCenter + sphereSubtendedHalf + t * spanMiss;
+                    const ux = Math.cos(rayAngle);
+                    const uy = Math.sin(rayAngle);
+
+                    ctx.strokeStyle = 'rgba(245, 158, 11, 0.75)';
+                    ctx.lineWidth = 1.4 / scale;
+                    ctx.beginPath();
+                    ctx.moveTo(cVec.x, cVec.y);
+                    ctx.lineTo(cVec.x + ux * viewReach, cVec.y + uy * viewReach);
+                    ctx.stroke();
+
+                    drawSmallArrowHead(cVec.x + ux * (90 / scale), cVec.y + uy * (90 / scale), rayAngle, '#f59e0b', (6.5 * symbolScaleMultiplier) / scale);
+                    if (viewReach > 350 / scale) {
+                        drawSmallArrowHead(cVec.x + ux * (270 / scale), cVec.y + uy * (270 / scale), rayAngle, 'rgba(245, 158, 11, 0.65)', (6.5 * symbolScaleMultiplier) / scale);
+                    }
+                }
+                ctx.restore();
+            }
+
+            // --- 2B. Induced Charge Field (E_ind) ---
+            if (showOutsideInd) {
+                ctx.save();
+                const isSuperposition = showOutsideQ && showOutsideInd;
+                const trackOffset = isSuperposition ? (2.2 / scale) : 0;
+
+                // 1. Inside conductor sphere: field lines point directly toward +Q (opposing E_Q)
+                const totalRays = Math.max(16, Math.round(numFieldLines * 0.6));
+                for (let i = 0; i < totalRays; i++) {
+                    const t = (i + 0.5) / totalRays;
+                    const rayAngle = angleToCenter - sphereSubtendedHalf * 0.92 + t * (2 * sphereSubtendedHalf * 0.92);
+                    const ux = Math.cos(rayAngle);
+                    const uy = Math.sin(rayAngle);
+
+                    const B = 2 * (cVec.x * ux + cVec.y * uy);
+                    const C = d * d - b * b;
+                    const disc = B * B - 4 * C;
+                    if (disc > 0) {
+                        const sqrtD = Math.sqrt(disc);
+                        const t1 = (-B - sqrtD) * 0.5;
+                        const t2 = (-B + sqrtD) * 0.5;
+
+                        const nx = -uy;
+                        const ny = ux;
+                        const pEntry = { x: cVec.x + ux * t1, y: cVec.y + uy * t1 };
+                        const pExit = { x: cVec.x + ux * t2, y: cVec.y + uy * t2 };
+
+                        ctx.strokeStyle = '#c084fc';
+                        ctx.lineWidth = 1.9 / scale;
+                        ctx.beginPath();
+                        ctx.moveTo(pExit.x - nx * trackOffset, pExit.y - ny * trackOffset);
+                        ctx.lineTo(pEntry.x - nx * trackOffset, pEntry.y - ny * trackOffset);
+                        ctx.stroke();
+
+                        const midT = t1 + (t2 - t1) * 0.55;
+                        const revAngle = rayAngle + Math.PI;
+                        drawSmallArrowHead(cVec.x + ux * midT - nx * trackOffset, cVec.y + uy * midT - ny * trackOffset, revAngle, '#c084fc', (7.5 * symbolScaleMultiplier) / scale);
+                    }
+                }
+
+                // 2. Outside conductor sphere: induced charges create electric field in external space
+                if (isGrounded) {
+                    // Grounded: all induced charges are negative. External field points INWARD towards sphere.
+                    const numExtIndLines = 24;
+                    for (let i = 0; i < numExtIndLines; i++) {
+                        const t = -1 + (2 * i) / (numExtIndLines - 1);
+                        const clusterAngle = Math.sign(t) * Math.pow(Math.abs(t), 1.1) * Math.PI;
+                        const worldAngle = qAngle + clusterAngle;
+                        const startR = b + 4;
+                        const sx = Math.cos(worldAngle) * startR;
+                        const sy = Math.sin(worldAngle) * startR;
+
+                        const linePts = traceOutsideInducedFieldLine(sx, sy, state, b, 1600, -1, viewReach);
+                        if (linePts.length >= 2) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = 'rgba(192, 132, 252, 0.75)';
+                            ctx.lineWidth = 1.4 / scale;
+                            ctx.moveTo(linePts[0].x, linePts[0].y);
+                            for (let j = 1; j < linePts.length; j++) {
+                                ctx.lineTo(linePts[j].x, linePts[j].y);
+                            }
+                            ctx.stroke();
+
+                            if (linePts.length > 8) {
+                                const midIdx = Math.floor(linePts.length * 0.45);
+                                const p1 = linePts[midIdx];
+                                const p2 = linePts[midIdx + 1];
+                                if (p1 && p2) {
+                                    const arrAng = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+                                    drawSmallArrowHead(p1.x, p1.y, arrAng, '#c084fc', (7 * symbolScaleMultiplier) / scale);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // ISOLATED: binary-search for σ=0 crossover angle
+                    let thetaLo = 0.01, thetaHi = Math.PI - 0.01;
+                    for (let iter = 0; iter < 32; iter++) {
+                        const thetaMid = (thetaLo + thetaHi) * 0.5;
+                        if (getOutsideSurfaceChargeDensity(thetaMid, d) < 0) {
+                            thetaLo = thetaMid;
+                        } else {
+                            thetaHi = thetaMid;
+                        }
+                    }
+                    const thetaCrossover = (thetaLo + thetaHi) * 0.5;
+                    const posHalfWidth = Math.PI - thetaCrossover;
+                    const numExtIndLines = 20;
+                    const inset = posHalfWidth * 0.06;
+
+                    const angLo = thetaCrossover + inset;
+                    const angHi = Math.PI - inset;
+                    for (let i = 0; i < numExtIndLines; i++) {
+                        const frac = (i + 0.5) / numExtIndLines;
+                        const thetaRel = angLo + frac * (angHi - angLo);
+                        const emitAngles = (Math.abs(thetaRel - Math.PI) < 0.02)
+                            ? [qAngle + Math.PI]
+                            : [qAngle + thetaRel, qAngle - thetaRel];
+
+                        for (const emitAngle of emitAngles) {
+                            const startR = b + 4;
+                            const sx = Math.cos(emitAngle) * startR;
+                            const sy = Math.sin(emitAngle) * startR;
+
+                            const linePts = traceOutsideInducedFieldLine(sx, sy, state, b, 1600, 1, viewReach);
+                            if (linePts.length >= 2) {
+                                ctx.beginPath();
+                                ctx.strokeStyle = 'rgba(192, 132, 252, 0.78)';
+                                ctx.lineWidth = 1.4 / scale;
+                                ctx.moveTo(linePts[0].x, linePts[0].y);
+                                for (let j = 1; j < linePts.length; j++) {
+                                    ctx.lineTo(linePts[j].x, linePts[j].y);
+                                }
+                                ctx.stroke();
+
+                                if (linePts.length > 6) {
+                                    const midIdx = Math.floor(linePts.length * 0.45);
+                                    const p1 = linePts[midIdx];
+                                    const p2 = linePts[midIdx + 1];
+                                    if (p1 && p2) {
+                                        const arrAng = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                                        drawSmallArrowHead(p2.x, p2.y, arrAng, '#c084fc', (7 * symbolScaleMultiplier) / scale);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // --- 2C. Total Equilibrium Field (E_total) ---
+            if (showOutsideTotal) {
+                ctx.save();
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 1.5 / scale;
+
+                const startR = 10;
+                for (let i = 0; i < numFieldLines; i++) {
+                    const ang = (i / numFieldLines) * Math.PI * 2;
+                    const sx = cVec.x + Math.cos(ang) * startR;
+                    const sy = cVec.y + Math.sin(ang) * startR;
+
+                    const linePts = traceOutsideTotalFieldLine(sx, sy, state, b, 1600, 1, viewReach);
+                    if (linePts.length > 2) {
+                        ctx.beginPath();
+                        ctx.moveTo(linePts[0].x, linePts[0].y);
+                        for (let j = 1; j < linePts.length; j++) {
+                            ctx.lineTo(linePts[j].x, linePts[j].y);
+                        }
+                        ctx.stroke();
+
+                        if (linePts.length > 10) {
+                            const midIdx = Math.floor(linePts.length * 0.45);
+                            const p1 = linePts[midIdx];
+                            const p2 = linePts[midIdx + 1];
+                            if (p1 && p2) {
+                                const arrAng = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                                drawSmallArrowHead(p2.x, p2.y, arrAng, '#38bdf8', (6.5 * symbolScaleMultiplier) / scale);
+                            }
+                        }
+                    }
+                }
+
+                // If isolated, positive charges on far side emit field lines to infinity
+                if (!isGrounded) {
+                    const numFarLines = 16;
+                    for (let i = 0; i < numFarLines; i++) {
+                        const relAng = Math.PI - 0.75 + (i / (numFarLines - 1)) * 1.5;
+                        const worldAng = qAngle + relAng;
+                        const sx = Math.cos(worldAng) * (b + 1.2);
+                        const sy = Math.sin(worldAng) * (b + 1.2);
+
+                        const linePts = traceOutsideTotalFieldLine(sx, sy, state, b, 1600, 1, viewReach);
+                        if (linePts.length > 2) {
+                            ctx.beginPath();
+                            ctx.moveTo(linePts[0].x, linePts[0].y);
+                            for (let j = 1; j < linePts.length; j++) {
+                                ctx.lineTo(linePts[j].x, linePts[j].y);
+                            }
+                            ctx.stroke();
+
+                            if (linePts.length > 6) {
+                                const midIdx = Math.floor(linePts.length * 0.4);
+                                const p1 = linePts[midIdx];
+                                const p2 = linePts[midIdx + 1];
+                                if (p1 && p2) {
+                                    const arrAng = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                                    drawSmallArrowHead(p2.x, p2.y, arrAng, '#38bdf8', (6.5 * symbolScaleMultiplier) / scale);
+                                }
+                            }
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // (Paired cancellation badge and vectors removed per user request)
+
+            // 4. Interactive Live Mouse Probe inside sphere
+            if (isMouseInsideSphere && Math.hypot(mouseWorldPos.x, mouseWorldPos.y) < b - 2) {
+                ctx.save();
+                const mx = mouseWorldPos.x;
+                const my = mouseWorldPos.y;
+                const toQ = { x: cVec.x - mx, y: cVec.y - my };
+                const distQ = Math.hypot(toQ.x, toQ.y);
+                const uQ = { x: toQ.x / distQ, y: toQ.y / distQ };
+
+                // Glowing target circle
+                ctx.fillStyle = 'rgba(34, 211, 238, 0.35)';
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 1.5 / scale;
+                ctx.beginPath();
+                ctx.arc(mx, my, 6 / scale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Paired vectors at mouse probe
+                const probeLen = 32 * symbolScaleMultiplier / scale;
+                // E_Q (amber, away from +Q)
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 2.5 / scale;
+                ctx.beginPath();
+                ctx.moveTo(mx, my);
+                ctx.lineTo(mx - uQ.x * probeLen, my - uQ.y * probeLen);
+                ctx.stroke();
+                drawSmallArrowHead(mx - uQ.x * probeLen, my - uQ.y * probeLen, Math.atan2(-uQ.y, -uQ.x), '#fbbf24', 8 / scale);
+
+                // E_ind (purple, toward +Q)
+                ctx.strokeStyle = '#c084fc';
+                ctx.lineWidth = 2.5 / scale;
+                ctx.beginPath();
+                ctx.moveTo(mx, my);
+                ctx.lineTo(mx + uQ.x * probeLen, my + uQ.y * probeLen);
+                ctx.stroke();
+                drawSmallArrowHead(mx + uQ.x * probeLen, my + uQ.y * probeLen, Math.atan2(uQ.y, uQ.x), '#c084fc', 8 / scale);
+
+                // Tooltip Card next to mouse
+                const cardX = mx + 16 / scale;
+                const cardY = my - 35 / scale;
+                const cw = 148 / scale;
+                const ch = 56 / scale;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 1 / scale;
+                ctx.beginPath();
+                ctx.roundRect(cardX, cardY, cw, ch, 6 / scale);
+                ctx.fill();
+                ctx.stroke();
+
+                const eVal = (Q / (distQ * distQ) * 1000).toFixed(2);
+                ctx.font = `bold ${9 / scale}px sans-serif`;
+                ctx.fillStyle = '#38bdf8';
+                ctx.textAlign = 'left';
+                ctx.fillText("導體內部探針檢測點", cardX + 8 / scale, cardY + 12 / scale);
+
+                ctx.font = `${8.5 / scale}px monospace`;
+                ctx.fillStyle = '#fbbf24';
+                ctx.fillText(`|EQ|  = ${eVal} (背向+Q)`, cardX + 8 / scale, cardY + 25 / scale);
+                ctx.fillStyle = '#c084fc';
+                ctx.fillText(`|Eind|= ${eVal} (指向+Q)`, cardX + 8 / scale, cardY + 37 / scale);
+                ctx.fillStyle = '#34d399';
+                ctx.fillText(`|Etot|= 0.000 (完全抵銷)`, cardX + 8 / scale, cardY + 49 / scale);
+
+                ctx.restore();
+            }
+
+            // 5. Surface Induced Charges along r = b (Dynamically tracking and clustering with +Q)
+            ctx.save();
+            const numAngleSteps = 360;
+            const stepRad = (Math.PI * 2) / numAngleSteps;
+            const negAngles = [];
+            const negWeights = [];
+            let negTotal = 0;
+            const posAngles = [];
+            const posWeights = [];
+            let posTotal = 0;
+            let maxSigma = 0;
+
+            for (let i = 0; i < numAngleSteps; i++) {
+                // thetaRel from -PI to +PI where 0 is directly facing +Q
+                const thetaRel = -Math.PI + i * stepRad;
+                const sigmaVal = getOutsideSurfaceChargeDensity(thetaRel, d);
+                const absVal = Math.abs(sigmaVal);
+                if (absVal > maxSigma) maxSigma = absVal;
+
+                if (sigmaVal < 0) {
+                    negAngles.push(thetaRel);
+                    negWeights.push(absVal);
+                    negTotal += absVal;
+                } else if (!isGrounded && sigmaVal > 0) {
+                    posAngles.push(thetaRel);
+                    posWeights.push(absVal);
+                    posTotal += absVal;
+                }
+            }
+
+            valSigmaMax.textContent = (maxSigma * 1000).toFixed(2);
+
+            // Dynamically sample Negative Nodes (clustering towards +Q as d decreases)
+            // Circle radius fixed (independent of symbolScaleMultiplier); only font scales
+            const numNegNodes = Math.max(20, Math.round(36 * (symbolScaleMultiplier >= 1.8 ? 0.8 : 1.0)));
+            if (negAngles.length > 0 && negTotal > 1e-12) {
+                let currentIdx = 0;
+                let currentAccum = 0;
+
+                for (let k = 0; k < numNegNodes; k++) {
+                    const targetWeight = ((k + 0.5) / numNegNodes) * negTotal;
+                    while (currentIdx < negWeights.length - 1 && currentAccum + negWeights[currentIdx] < targetWeight) {
+                        currentAccum += negWeights[currentIdx];
+                        currentIdx++;
+                    }
+
+                    const thetaRel = negAngles[currentIdx];
+                    const worldAngle = qAngle + thetaRel;
+                    const px = Math.cos(worldAngle) * b;
+                    const py = Math.sin(worldAngle) * b;
+
+                    const localSigma = negWeights[currentIdx];
+                    const intensity = Math.min(1.0, (localSigma / (maxSigma || 1e-4)) * 1.25);
+
+                    // Fixed-size circle (does not grow with font slider)
+                    const nodeR = (2.4 + intensity * 3.2) / scale;
+                    ctx.fillStyle = `rgba(244, 63, 94, ${0.45 + intensity * 0.55})`;
+                    ctx.beginPath();
+                    ctx.arc(px, py, nodeR, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Font scales for far-projection visibility
+                    ctx.fillStyle = '#ffe4e6';
+                    const minusFontSize = Math.round(Math.max(10, 12 * (0.75 + intensity * 0.45)) * symbolScaleMultiplier);
+                    ctx.font = `bold ${minusFontSize / scale}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('-', px, py);
+                }
+            }
+
+            // Dynamically sample Positive Nodes (spread out on far hemisphere, if isolated)
+            // Positive nodes get cyan/neon glow emphasis; circle fixed size; font scales
+            if (!isGrounded && posAngles.length > 0 && posTotal > 1e-12) {
+                const numPosNodes = Math.max(16, Math.round(24 * (symbolScaleMultiplier >= 1.8 ? 0.8 : 1.0)));
+                let currentIdx = 0;
+                let currentAccum = 0;
+
+                for (let k = 0; k < numPosNodes; k++) {
+                    const targetWeight = ((k + 0.5) / numPosNodes) * posTotal;
+                    while (currentIdx < posWeights.length - 1 && currentAccum + posWeights[currentIdx] < targetWeight) {
+                        currentAccum += posWeights[currentIdx];
+                        currentIdx++;
+                    }
+
+                    const thetaRel = posAngles[currentIdx];
+                    const worldAngle = qAngle + thetaRel;
+                    const px = Math.cos(worldAngle) * b;
+                    const py = Math.sin(worldAngle) * b;
+
+                    const localSigma = posWeights[currentIdx];
+                    const intensity = Math.min(1.0, (localSigma / (maxSigma || 1e-4)) * 1.1);
+
+                    // Fixed-size circle (does not grow with font slider) with cyan neon glow
+                    const nodeR = (2.2 + intensity * 3.0) / scale;
+                    ctx.save();
+                    ctx.fillStyle = `rgba(6, 182, 212, ${0.45 + intensity * 0.55})`;
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 7 + intensity * 8;
+                    ctx.beginPath();
+                    ctx.arc(px, py, nodeR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    // Bold white + symbol for strong visibility
+                    ctx.fillStyle = '#ecfeff';
+                    const plusFontSize = Math.round(Math.max(10, 11 * (0.75 + intensity * 0.45)) * symbolScaleMultiplier);
+                    ctx.font = `bold ${plusFontSize / scale}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('+', px, py);
+                }
+            }
+            ctx.restore();
+
+            // 6. Virtual Image Charges q' and q0 (if enabled)
+            // Circle radius fixed (does not scale with font slider)
+            if (showOutsideImages) {
+                ctx.save();
+                // Dashed connection line: (0,0) -> q' -> +Q
+                ctx.setLineDash([4 / scale, 4 / scale]);
+                ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+                ctx.lineWidth = 1.5 / scale;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(cVec.x, cVec.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Virtual image charge q' — fixed circle radius
+                const qpR = 8.5 / scale;
+                ctx.fillStyle = '#a855f7';
+                ctx.shadowColor = '#c084fc';
+                ctx.shadowBlur = 14;
+                ctx.beginPath();
+                ctx.arc(imagePos.x, imagePos.y, qpR, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Label scales with font slider
+                ctx.font = `bold ${Math.round(11 * symbolScaleMultiplier) / scale}px monospace`;
+                ctx.fillStyle = '#e9d5ff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(`q' = ${qPrime.toFixed(2)} Q`, imagePos.x, imagePos.y - (11 * symbolScaleMultiplier) / scale);
+
+                // Center charge q0 at origin (if isolated) — fixed circle radius
+                if (!isGrounded && q0) {
+                    const q0R = 7.5 / scale;
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.shadowColor = '#0284c7';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, q0R, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    ctx.font = `bold ${Math.round(10.5 * symbolScaleMultiplier) / scale}px monospace`;
+                    ctx.fillStyle = '#bae6fd';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(`q₀ = +${q0.toFixed(2)} Q`, 0, (9 * symbolScaleMultiplier) / scale);
+                }
+                ctx.restore();
+            }
+
+            // 7. Draggable External Point Charge +Q
+            // Circle radius FIXED (independent of font/symbol slider) with vivid amber glow
+            ctx.save();
+            const chargeR = 12 / scale;  // Fixed size, does not balloon
+
+            // Outer glow halo
+            ctx.beginPath();
+            ctx.arc(cVec.x, cVec.y, chargeR + 6 / scale, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
+            ctx.fill();
+
+            // Core circle
+            ctx.beginPath();
+            ctx.arc(cVec.x, cVec.y, chargeR, 0, Math.PI * 2);
+            ctx.fillStyle = '#f59e0b';
+            ctx.shadowColor = '#fbbf24';
+            ctx.shadowBlur = 20;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.0 / scale;
+            ctx.stroke();
+
+            // Bold white + symbol (always crisp inside circle)
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${13 / scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('+', cVec.x, cVec.y + 0.5 / scale);
+
+            // Floating +Q label above (scales with font slider)
+            const extQLabelSize = Math.round(11.5 * symbolScaleMultiplier);
+            ctx.font = `bold ${extQLabelSize / scale}px sans-serif`;
+            ctx.fillStyle = '#fde68a';
+            ctx.fillText('+Q', cVec.x, cVec.y - (17 * symbolScaleMultiplier) / scale);
+            ctx.restore();
+
+            // 8. Attraction Force Vector on +Q towards Conductor
+            if (attractionForce > 0.01) {
+                ctx.save();
+                const toOrigin = { x: -cVec.x / d, y: -cVec.y / d };
+                const forceLen = Math.min(85 * symbolScaleMultiplier, Math.max(16 * symbolScaleMultiplier, attractionForce * 0.45 * symbolScaleMultiplier));
+                const endX = cVec.x + toOrigin.x * forceLen;
+                const endY = cVec.y + toOrigin.y * forceLen;
+
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = (3 * symbolScaleMultiplier) / scale;
+                ctx.beginPath();
+                ctx.moveTo(cVec.x, cVec.y);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+
+                const arrAng = Math.atan2(toOrigin.y, toOrigin.x);
+                drawSmallArrowHead(endX, endY, arrAng, '#10b981', (9 * symbolScaleMultiplier) / scale);
+
+                const fLabelSize = Math.round(11 * symbolScaleMultiplier);
+                // Choose perpendicular sign that points DOWNWARDS on screen (perpY > 0)
+                // so the force label is always placed below the vector, away from the '+Q' text floating above!
+                let perpX = -toOrigin.y;
+                let perpY = toOrigin.x;
+                if (perpY < 0) {
+                    perpX = -perpX;
+                    perpY = -perpY;
+                }
+                const labelDist = (18 * symbolScaleMultiplier) / scale;
+                const midX = (cVec.x + endX) * 0.5 + perpX * labelDist;
+                const midY = (cVec.y + endY) * 0.5 + perpY * labelDist;
+                drawVecLabel('F', ' (導體淨吸引力)', midX, midY, '#34d399', fLabelSize, 'center');
+                ctx.restore();
+            }
+        }
+
+        // Real-Time Graph Canvas for Surface Charge Density sigma(theta)
+        function renderChargeGraph(param) {
+            const rect = graphCanvas.getBoundingClientRect();
+            const w = rect.width;
+            const h = rect.height;
+            graphCtx.clearRect(0, 0, w, h);
+
+            if (simMode === 'inside') {
+                const c = param;
+                // Axes and Grid Lines
+                graphCtx.strokeStyle = 'rgba(51, 65, 85, 0.6)';
+                graphCtx.lineWidth = 1;
+                graphCtx.beginPath();
+                graphCtx.moveTo(40, 12);
+                graphCtx.lineTo(40, h - 22);
+                graphCtx.lineTo(w - 15, h - 22);
+                graphCtx.stroke();
+
+                // Axis Tick Labels
+                graphCtx.fillStyle = '#94a3b8';
+                graphCtx.font = '10px monospace';
+                graphCtx.textAlign = 'center';
+                graphCtx.fillText('0° (近側)', 45, h - 6);
+                graphCtx.fillText('90°', (w - 55) * 0.5 + 40, h - 6);
+                graphCtx.fillText('180° (遠側)', w - 35, h - 6);
+                graphCtx.textAlign = 'left';
+                graphCtx.fillText('|σ|', 12, 18);
+
+                // Compute Curve Data Points
+                let maxSigma = 0;
+                const points = [];
+                for (let deg = 0; deg <= 180; deg += 2) {
+                    const rad = (deg * Math.PI) / 180;
+                    const sigmaVal = Math.abs(getInnerSurfaceChargeDensity(rad, c));
+                    if (sigmaVal > maxSigma) maxSigma = sigmaVal;
+                    points.push({ deg, val: sigmaVal });
+                }
+
+                const scaleY = (h - 40) / (maxSigma || 1e-4);
+
+                // Gradient Area Fill Under Curve
+                const areaGrad = graphCtx.createLinearGradient(0, 15, 0, h - 22);
+                areaGrad.addColorStop(0, 'rgba(6, 182, 212, 0.35)');
+                areaGrad.addColorStop(1, 'rgba(6, 182, 212, 0.02)');
+
+                graphCtx.beginPath();
+                points.forEach((pt, idx) => {
+                    const px = 40 + (pt.deg / 180) * (w - 55);
+                    const py = (h - 22) - pt.val * scaleY;
+                    if (idx === 0) graphCtx.moveTo(px, py);
+                    else graphCtx.lineTo(px, py);
+                });
+                graphCtx.lineTo(40 + (w - 55), h - 22);
+                graphCtx.lineTo(40, h - 22);
+                graphCtx.closePath();
+                graphCtx.fillStyle = areaGrad;
+                graphCtx.fill();
+
+                // Stroke Curve
+                graphCtx.beginPath();
+                graphCtx.strokeStyle = '#22d3ee';
+                graphCtx.lineWidth = 2;
+                points.forEach((pt, idx) => {
+                    const px = 40 + (pt.deg / 180) * (w - 55);
+                    const py = (h - 22) - pt.val * scaleY;
+                    if (idx === 0) graphCtx.moveTo(px, py);
+                    else graphCtx.lineTo(px, py);
+                });
+                graphCtx.stroke();
+
+                // Peak Indicator Dot
+                if (points.length > 0) {
+                    const peakPt = points[0];
+                    const px = 40;
+                    const py = (h - 22) - peakPt.val * scaleY;
+                    graphCtx.fillStyle = '#f43f5e';
+                    graphCtx.beginPath();
+                    graphCtx.arc(px, py, 3.5, 0, Math.PI * 2);
+                    graphCtx.fill();
+                }
+            } else {
+                // Outside mode: sigma(theta) crosses zero!
+                const d = param;
+                const midY = (h - 10) * 0.5;
+
+                // Center Zero Line
+                graphCtx.strokeStyle = 'rgba(71, 85, 105, 0.7)';
+                graphCtx.lineWidth = 1;
+                graphCtx.beginPath();
+                graphCtx.moveTo(40, 10);
+                graphCtx.lineTo(40, h - 20);
+                graphCtx.moveTo(40, midY);
+                graphCtx.lineTo(w - 15, midY);
+                graphCtx.stroke();
+
+                // Labels
+                graphCtx.fillStyle = '#94a3b8';
+                graphCtx.font = '10px monospace';
+                graphCtx.textAlign = 'center';
+                graphCtx.fillText('0° (近側負電)', 50, h - 6);
+                graphCtx.fillText('90°', (w - 55) * 0.5 + 40, h - 6);
+                graphCtx.fillText('180° (遠側正電)', w - 40, h - 6);
+                graphCtx.textAlign = 'left';
+                graphCtx.fillText('+σ', 14, 18);
+                graphCtx.fillText('-σ', 14, h - 22);
+
+                const rawPoints = [];
+                let maxAbs = 0;
+                for (let deg = 0; deg <= 180; deg += 2) {
+                    const rad = (deg * Math.PI) / 180;
+                    const s = getOutsideSurfaceChargeDensity(rad, d);
+                    rawPoints.push({ deg, s });
+                    if (Math.abs(s) > maxAbs) maxAbs = Math.abs(s);
+                }
+
+                const scaleY = (midY - 14) / (maxAbs || 1e-4);
+
+                // Draw negative zone (below midY) in rose, positive zone (above midY) in cyan
+                graphCtx.beginPath();
+                rawPoints.forEach((pt, idx) => {
+                    const px = 40 + (pt.deg / 180) * (w - 55);
+                    const py = midY - pt.s * scaleY;
+                    if (idx === 0) graphCtx.moveTo(px, py);
+                    else graphCtx.lineTo(px, py);
+                });
+                graphCtx.lineTo(40 + (w - 55), midY);
+                graphCtx.lineTo(40, midY);
+                graphCtx.closePath();
+
+                const gradOut = graphCtx.createLinearGradient(0, 10, 0, h - 20);
+                gradOut.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+                gradOut.addColorStop(0.5, 'rgba(15, 23, 42, 0.05)');
+                gradOut.addColorStop(1, 'rgba(244, 63, 94, 0.35)');
+                graphCtx.fillStyle = gradOut;
+                graphCtx.fill();
+
+                // Curve outline
+                graphCtx.beginPath();
+                graphCtx.strokeStyle = '#38bdf8';
+                graphCtx.lineWidth = 2;
+                rawPoints.forEach((pt, idx) => {
+                    const px = 40 + (pt.deg / 180) * (w - 55);
+                    const py = midY - pt.s * scaleY;
+                    if (idx === 0) graphCtx.moveTo(px, py);
+                    else graphCtx.lineTo(px, py);
+                });
+                graphCtx.stroke();
+
+                // Zero crossing marker
+                for (let i = 0; i < rawPoints.length - 1; i++) {
+                    if ((rawPoints[i].s <= 0 && rawPoints[i + 1].s >= 0) || (rawPoints[i].s >= 0 && rawPoints[i + 1].s <= 0)) {
+                        const t = -rawPoints[i].s / (rawPoints[i + 1].s - rawPoints[i].s);
+                        const zeroDeg = rawPoints[i].deg + t * (rawPoints[i + 1].deg - rawPoints[i].deg);
+                        const px = 40 + (zeroDeg / 180) * (w - 55);
+                        graphCtx.fillStyle = '#34d399';
+                        graphCtx.beginPath();
+                        graphCtx.arc(px, midY, 3.5, 0, Math.PI * 2);
+                        graphCtx.fill();
+
+                        graphCtx.font = '9px monospace';
+                        graphCtx.fillStyle = '#34d399';
+                        graphCtx.textAlign = 'center';
+                        graphCtx.fillText(`σ=0 (${zeroDeg.toFixed(0)}°)`, px, midY - 6);
+                        break;
+                    }
+                }
+            }
+        }
+
+
+        // ==========================================
+        // 5. Main Render Loop
+        // ==========================================
+        function render() {
+            const rect = canvas.getBoundingClientRect();
+            ctx.clearRect(0, 0, rect.width, rect.height);
+
+            const state = getPhysicsState();
+            const { center, cVec, c, dist, d, dPrime, qPrime, cPrimeDist, attractionForce } = state;
+
+            // Update Real-Time HUD Text
+            if (simMode === 'inside') {
+                valC.textContent = c.toFixed(1);
+                valCRatio.textContent = `(${(c / a).toFixed(2)} a)`;
+                valCprime.textContent = isFinite(cPrimeDist) ? `${cPrimeDist.toFixed(1)} px (${(cPrimeDist / a).toFixed(2)} a)` : "∞";
+                valQprime.textContent = isFinite(qPrime) ? `${qPrime.toFixed(2)} Q` : "-1.00 Q";
+                valForce.textContent = isFinite(attractionForce) ? attractionForce.toFixed(2) : "0.00";
+            } else {
+                valC.textContent = d.toFixed(1);
+                valCRatio.textContent = `(${(d / b).toFixed(2)} b)`;
+                valCprime.textContent = `${dPrime.toFixed(1)} px (${(dPrime / b).toFixed(2)} b)`;
+                valQprime.textContent = `${qPrime.toFixed(2)} Q`;
+                valForce.textContent = isFinite(attractionForce) ? attractionForce.toFixed(2) : "0.00";
+            }
+
+            const qAngle = Math.atan2(cVec.y, cVec.x);
+
+            // World Coordinate Transform
+            ctx.save();
+            ctx.translate(center.x, center.y);
+            ctx.scale(scale, scale);
+
+            if (simMode === 'inside') {
+                // Inside Cavity Pipeline
+                if (chkContours.checked) drawEquipotentials(state);
+                drawElectricFieldLines(state);
+                drawConductorShell();
+                if (chkSurfaceCharge.checked) drawInnerSurfaceCharge(state, qAngle);
+                if (chkImageCharge.checked && c > 2) drawImageCharge(state);
+                drawRealCharge(state);
+                if (chkForceVector.checked && c > 2) drawForceVector(state);
+            } else {
+                // Outside Conductor Pipeline
+                drawOutsideMode(state);
+            }
+
+            ctx.restore();
+
+            // Real-Time Graph
+            renderChargeGraph(dist || c);
+
+            requestAnimationFrame(render);
+        }
+
+        // Start Animation Loop
+        requestAnimationFrame(render);
+    </script>
+</body>
+
+</html>
