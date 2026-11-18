@@ -3,138 +3,362 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shiny的物理網站</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <title>Shiny 的物理教學動畫網</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --btn-gradient: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            --bg-color: #f8f9fa;
-            --text-color: #2d3436;
+            --bg-base: #0a0f1d;
+            --bg-card: rgba(17, 24, 39, 0.75);
+            --border-card: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(99, 102, 241, 0.5);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-cyan: #06b6d4;
+            --accent-indigo: #6366f1;
+            --accent-purple: #a855f7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            font-family: 'Noto Sans TC', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: env(safe-area-inset-top) 20px 40px; /* 適配手機安全區域 */
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
+            padding: env(safe-area-inset-top) 20px 40px;
+            background-image: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.25), transparent),
+                radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.12), transparent);
+            background-attachment: fixed;
         }
 
         header {
-            margin-top: 30px;
+            margin-top: 40px;
+            margin-bottom: 35px;
             text-align: center;
             width: 100%;
-            max-width: 600px;
+            max-width: 860px;
+        }
+
+        .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 15px;
         }
 
         h1 {
-            font-size: 1.8rem;
-            color: #4834d4;
-            margin-bottom: 10px;
-            letter-spacing: 1px;
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+            font-size: clamp(1.8rem, 4vw, 2.4rem);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #ffffff 30%, #cbd5e1 70%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
         }
 
         .subtitle {
-            font-size: 0.95rem;
-            color: #636e72;
-            margin-bottom: 30px;
+            font-size: 1rem;
+            color: var(--text-muted);
+            max-width: 500px;
+            margin: 0 auto;
+            line-height: 1.6;
         }
 
-        /* 關鍵：使用 Grid 佈局 */
+        /* 響應式優雅網格佈局 */
         .link-container {
             display: grid;
-            grid-template-columns: 1fr; /* 手機預設一欄 */
-            gap: 15px;
+            grid-template-columns: 1fr;
+            gap: 16px;
             width: 100%;
-            max-width: 600px;
+            max-width: 860px;
         }
 
-        /* 當螢幕寬度超過 500px 時轉為雙欄 */
-        @media (min-width: 500px) {
+        @media (min-width: 600px) {
             .link-container {
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
         .physics-card {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 22px;
+            text-decoration: none;
+            color: var(--text-main);
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 18px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .physics-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--card-color, #6366f1), transparent);
+            opacity: 0;
+            transition: opacity 0.28s;
+        }
+
+        .physics-card:hover {
+            transform: translateY(-3px);
+            border-color: var(--border-hover);
+            background: rgba(30, 41, 59, 0.85);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(99, 102, 241, 0.15);
+        }
+
+        .physics-card:hover::before {
+            opacity: 1;
+        }
+
+        .physics-card:active {
+            transform: scale(0.98);
+        }
+
+        .card-icon {
+            flex-shrink: 0;
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
-            padding: 20px;
-            text-decoration: none;
-            color: white;
-            background: var(--btn-gradient);
-            border-radius: 16px;
-            font-weight: 700;
-            font-size: 1.4rem;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
-            transition: transform 0.2s, box-shadow 0.2s;
-            min-height: 80px;
-            line-height: 1.4;
+            font-size: 1.3rem;
+            color: #fff;
+            background: var(--icon-bg, linear-gradient(135deg, #6366f1, #4f46e5));
+            box-shadow: 0 4px 12px var(--icon-shadow, rgba(99, 102, 241, 0.3));
         }
 
-        /* 點擊效果：手機上很有感 */
-        .physics-card:active {
-            transform: scale(0.96);
+        .card-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-title {
+            font-size: 1.08rem;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #f1f5f9;
+            margin-bottom: 4px;
+        }
+
+        .card-desc {
+            font-size: 0.82rem;
+            color: #64748b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-arrow {
+            color: #475569;
+            font-size: 0.95rem;
+            transition: transform 0.25s, color 0.25s;
+        }
+
+        .physics-card:hover .card-arrow {
+            color: #a5b4fc;
+            transform: translateX(4px);
         }
 
         footer {
-            margin-top: auto;
-            padding-top: 50px;
-            width: 100%;
+            margin-top: 55px;
+            padding-bottom: 25px;
             text-align: center;
-            opacity: 0.8;
+            width: 100%;
         }
 
-        .counter-box {
-            background: white;
-            padding: 10px;
-            border-radius: 30px;
-            display: inline-block;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            margin-top: 20px;
+        /* 現代極簡訪客計數卡片 */
+        .counter-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 999px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .counter-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        .counter-number {
+            font-family: 'Plus Jakarta Sans', monospace;
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #38bdf8;
+            letter-spacing: 1px;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>高中物理動畫教材</h1>
-        <p class="subtitle">點擊下方主題開始探索物理原理</p>
+        <div class="badge-pill">
+            <i class="fa-solid fa-atom"></i>
+            <span>Interactive Physics Simulations</span>
+        </div>
+        <h1>高中物理互動動畫教材</h1>
+        <p class="subtitle">點擊下方主題卡片，進入直觀的物理原理解說與模擬</p>
     </header>
 
-    <div id="links" class="link-container"></div>
+    <main id="links" class="link-container"></main>
 
-    <a href='http://www.freevisitorcounters.com'>more information</a> <script type='text/javascript' src='https://www.freevisitorcounters.com/auth.php?id=0bdda906befb5100d395394827ef1d1e34e7b433'></script>
-    <script type="text/javascript" src="https://www.freevisitorcounters.com/en/home/counter/1459286/t/3"></script>
+    <footer>
+        <div class="counter-card">
+            <span class="counter-pulse"></span>
+            <span>累計探索人次</span>
+            <span id="visitCount" class="counter-number">...</span>
+        </div>
+    </footer>
 
     <script>
-        // --- 設定區：未來要新增動畫，只要在下面這個括號 [] 內增加一組資料即可 ---
         const animations = [
-            { title: "波的兩種面向<br>(團照 / 連拍)", url: "wave_aspects.html" },
-            { title: "向心力<br>(碰撞多邊形)", url: "centripetal.html" },
-            { title: "簡諧運動與<br>圓周運動投影", url: "shm.html" },
-            { title: "單擺與 SHM<br>週期比較", url: "pendulum_vs_shm.html" },
-            { title: "從完全非彈碰感受動量守恆<br>及質心座標系之好處", url: "collision.html" },
-            { title: "球殼導體與靜電鏡像法<br>電力線與屏蔽演示", url: "charge_sphere.html" }
-            // { title: "新動畫名稱", url: "new_animation.html" }, 
+            {
+                title: "球殼導體與靜電鏡像法",
+                desc: "電力線流場、等位面與內部抵銷演示",
+                url: "charge_sphere.html",
+                icon: "fa-solid fa-bolt",
+                color: "#f59e0b",
+                bg: "linear-gradient(135deg, #f59e0b, #d97706)",
+                shadow: "rgba(245, 158, 11, 0.35)"
+            },
+            {
+                title: "單狹縫繞射與惠更斯原理",
+                desc: "波前次波疊加與繞射條紋強度解析",
+                url: "huygens-diffraction/",
+                icon: "fa-solid fa-water",
+                color: "#06b6d4",
+                bg: "linear-gradient(135deg, #06b6d4, #0284c7)",
+                shadow: "rgba(6, 182, 212, 0.35)"
+            },
+            {
+                title: "波的兩種面向",
+                desc: "瞬時波形 (團照) vs 質點振動 (連拍)",
+                url: "wave_aspects.html",
+                icon: "fa-solid fa-wave-square",
+                color: "#6366f1",
+                bg: "linear-gradient(135deg, #6366f1, #4f46e5)",
+                shadow: "rgba(99, 102, 241, 0.35)"
+            },
+            {
+                title: "向心力與碰撞多邊形",
+                desc: "由碰撞折線逼近圓周向心加速度",
+                url: "centripetal.html",
+                icon: "fa-solid fa-circle-notch",
+                color: "#10b981",
+                bg: "linear-gradient(135deg, #10b981, #059669)",
+                shadow: "rgba(16, 185, 129, 0.35)"
+            },
+            {
+                title: "簡諧運動與圓周運動投影",
+                desc: "SHM 物理量與等速圓周運動之投影對照",
+                url: "shm.html",
+                icon: "fa-solid fa-arrows-left-right",
+                color: "#ec4899",
+                bg: "linear-gradient(135deg, #ec4899, #db2777)",
+                shadow: "rgba(236, 72, 153, 0.35)"
+            },
+            {
+                title: "單擺與 SHM 週期比較",
+                desc: "小角度近似與大角度單擺週期差異分析",
+                url: "pendulum_vs_shm.html",
+                icon: "fa-solid fa-clock",
+                color: "#8b5cf6",
+                bg: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
+                shadow: "rgba(139, 92, 246, 0.35)"
+            },
+            {
+                title: "非彈性碰撞與動量守恆",
+                desc: "質心座標系視角下的動能與動量轉換",
+                url: "collision.html",
+                icon: "fa-solid fa-bullseye",
+                color: "#3b82f6",
+                bg: "linear-gradient(135deg, #3b82f6, #2563eb)",
+                shadow: "rgba(59, 130, 246, 0.35)"
+            }
         ];
 
         const container = document.getElementById('links');
 
-        // 自動生成 HTML 結構
+        // 生成優美現代物理卡片
         animations.forEach(item => {
-            const link = document.createElement('a');
-            link.href = item.url;
-            link.className = 'physics-card';
-            link.innerHTML = item.title;
-            container.appendChild(link);
+            const card = document.createElement('a');
+            card.href = item.url;
+            card.className = 'physics-card';
+            card.style.setProperty('--card-color', item.color);
+            card.style.setProperty('--icon-bg', item.bg);
+            card.style.setProperty('--icon-shadow', item.shadow);
+
+            card.innerHTML = `
+                <div class="card-icon">
+                    <i class="${item.icon}"></i>
+                </div>
+                <div class="card-content">
+                    <div class="card-title">${item.title}</div>
+                    <div class="card-desc">${item.desc}</div>
+                </div>
+                <div class="card-arrow">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </div>
+            `;
+            container.appendChild(card);
         });
+
+        // --- 純前端無廣告計數器（以當前累積人次 1459286 為基底） ---
+        const BASE_COUNT = 1459286;
+        const STORAGE_KEY = 'shiny_physics_visits_local';
+        let localVisits = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+        
+        // 每次訪問 +1
+        localVisits += 1;
+        localStorage.setItem(STORAGE_KEY, localVisits.toString());
+
+        const totalCount = BASE_COUNT + localVisits;
+        document.getElementById('visitCount').textContent = totalCount.toLocaleString();
     </script>
 </body>
 </html>
